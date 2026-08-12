@@ -101,6 +101,19 @@ uv run python experiments/adjudicate_eval.py       # paraphrase vs contradiction
 
 ## CockroachDB tools used
 
+**Cloud Managed MCP Server** — the agents' governed read path. Reads go through
+the managed endpoint at `https://cockroachlabs.cloud/mcp`, authenticated by a
+Cloud service account and scoped `mcp:read`. Writes never do, and *cannot*: the
+claim lock needs `SELECT ... FOR UPDATE` inside a multi-statement serializable
+transaction, which MCP's surface has no way to express.
+
+So agents inspect the fleet's beliefs through an endpoint they are structurally
+incapable of corrupting, while every mutation is funnelled through the one code
+path that takes the lock. `experiments/mcp_eval.py` verifies this rather than
+asserting it — nine escalating write attempts through the read tool (plain DML,
+stacked statements, a CTE-wrapped DELETE, comment- and newline-obscured payloads),
+all nine refused, with the memory re-read afterwards to confirm nothing changed.
+
 **Distributed Vector Indexing (C-SPANN)** — `CREATE VECTOR INDEX ON memory
 (scope, embedding)`, prefix-ordered so the scope filter accelerates. Every agent
 turn opens with an ANN search over it. Load-bearing: remove it and the READ phase

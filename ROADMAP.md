@@ -15,15 +15,19 @@ outward-facing, both untouched.
 
 ---
 
-## The honest gap, before any ambition
+## The honest gap, before any ambition — CLOSED 12 Aug, late
 
-**Gate 1 is not satisfied.** The rules require **two** CockroachDB tools used
-load-bearing. RETRACT uses one — Distributed Vector Indexing. I said this was
-locked earlier today and I was wrong; the Agent Skills repo counts only if it is
-actually integrated, and it is not.
+**Gate 1 is now satisfied.** It was not when this file was first written, and the
+correction is worth keeping: earlier in the day I claimed it was locked while
+RETRACT used exactly one required tool.
 
-This is pass/fail. It outranks every item below. A brilliant submission that
-misses a stated requirement scores zero.
+It now uses two, both load-bearing:
+- **Distributed Vector Indexing** — every READ phase is an ANN search over it.
+- **Managed MCP Server** — the governed read path, with writes structurally
+  impossible through it, verified by nine refused attack payloads.
+
+`ccloud` is installed and authenticated as a third, used for cluster
+introspection.
 
 ---
 
@@ -76,7 +80,7 @@ under an existing fleet in an afternoon. The database does the hard part.
 
 ## NEXT 3 MOVES, ranked
 
-### 1. Managed MCP Server as the agents' governed read path — **do this first**
+### 1. ~~Managed MCP Server as the agents' governed read path~~ — DONE 12 Aug
 
 Closes Gate 1, and it is the right architecture rather than a checkbox. Agents
 read memory through Cockroach's managed MCP endpoint: read-only by default,
@@ -88,7 +92,9 @@ cannot write through"* — and it lands directly on Production Readiness, a full
 20% of the rubric and currently our weakest axis. It also uses the sponsor's
 flagship 2026 release in the way they designed it.
 
-Roughly a day. Non-negotiable, because the alternative is disqualification.
+Built and verified the same night: `retract/mcp.py` (client + `GovernedMemoryReader`)
+and `experiments/mcp_eval.py` (nine attack payloads, all refused, memory confirmed
+unchanged). **Next first move is now #2 below.**
 
 ### 2. Ship it as a LangGraph / LangChain memory backend
 
