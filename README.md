@@ -24,14 +24,6 @@ forged passport is discovered, the refund it justified has been sent. Deleting
 the memory does not un-send the money, and a memory that cannot reach its own
 side effects is a diary, not a system of record.
 
-> **Prior art, up front.** [MemTX](https://arxiv.org/abs/2607.23929) (27 Jul 2026)
-> formalised transactional belief commit with cascading repair of side effects
-> three weeks before this submission, and verified it across 5.5M protocol states.
-> RETRACT did not invent this idea. What is ours is a measured argument that
-> identity cannot come from an embedding, a running implementation on a distributed
-> SQL database, and a cascade asserted on blast radius.
-> Full accounting: [RELATED-WORK.md](RELATED-WORK.md).
-
 ## The approach
 
 **Identity does not come from the embedding.** We measured this rather than
