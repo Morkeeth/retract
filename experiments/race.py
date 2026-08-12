@@ -55,8 +55,8 @@ def naive_write(url, scope, agent, emb, content, subject, predicate) -> str:
         cur.fetchall()
         time.sleep(0.4)  # think
         cur.execute(
-            "INSERT INTO memory (scope, content, embedding, bucket, subject, predicate, "
-            "embedder, author_agent, snapshot_ts) VALUES (%s,%s,%s::vector,0,%s,%s,'naive',%s,'0')",
+            "INSERT INTO memory (scope, content, embedding, subject, predicate, "
+            "embedder, author_agent, snapshot_ts) VALUES (%s,%s,%s::vector,%s,%s,'naive',%s,'0')",
             (scope, content, vec_literal(emb), subject, predicate, agent),
         )
     return "inserted"

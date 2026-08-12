@@ -85,9 +85,9 @@ def run_race(mode: str, q: "queue.Queue[dict]") -> None:
         if mode == "naive":
             with psycopg.connect(URL, autocommit=True) as c, c.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO memory (scope, content, embedding, bucket, subject, predicate,"
+                    "INSERT INTO memory (scope, content, embedding, subject, predicate,"
                     " embedder, author_agent, snapshot_ts)"
-                    " VALUES (%s,%s,%s::vector,0,%s,%s,'naive',%s,'0')",
+                    " VALUES (%s,%s,%s::vector,%s,%s,'naive',%s,'0')",
                     (scope, content, vec_literal(emb), subject, predicate, f"agent-{i}"),
                 )
             with lock:
