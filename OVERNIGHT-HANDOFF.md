@@ -68,6 +68,11 @@ AWS escalation re-verify. No secrets in this environment. Not stubbed green.
   redeploy — intentional.
 
 ## Morning checklist
+**Do not use this list as the day's plan.** Open [`MORNING-RUN.md`](MORNING-RUN.md)
+— it is the ambitious brief for you + Claude Code. It compresses Day 2 and Day 3
+into Thursday, with Gate 0 (land this PR on Cloud) before anything else.
+
+Minimum before merge (also Gate 0 in the morning brief):
 1. Apply `schema_v3.sql` on Cloud DB.
 2. Set `DEMO_TOKEN` on Railway; redeploy this branch.
 3. Run `compensate_eval.py` against Cloud; paste output into README.
