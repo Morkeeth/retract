@@ -6,10 +6,9 @@ like that. Paraphrases of one fact sit much closer together than synthetic noise
 suggests, and unrelated sentences sit much closer than random unit vectors do,
 because a language model's output occupies a narrow cone of the sphere.
 
-If the real same-fact and different-fact distributions OVERLAP where the
-synthetic ones were cleanly separated, then the threshold is wrong and the lock
-either misses duplicates or serialises the whole table. Either way, shipping the
-synthetic numbers would be shipping a guess.
+If the real same-fact and different-fact distributions OVERLAP, no distance
+threshold can carry deduplication -- which is exactly what this measures, on
+whichever embedder is configured.
 
 This measures the real thing, on paraphrase groups and on adversarially SIMILAR
 but genuinely different facts -- same customer, same topic, different claim --
@@ -67,32 +66,6 @@ ADVERSARIAL = [
 ]
 
 
-def lsh_rates(vectors_by_group, k: int, L: int, seed: int = 20260812):
-    dim = len(vectors_by_group[0][0])
-    rng = np.random.default_rng(seed)
-    planes = rng.normal(size=(L, k, dim))
-    weights = (1 << np.arange(k - 1, -1, -1)).astype(np.int64)
-    offsets = np.arange(L, dtype=np.int64) * (1 << k)
-
-    def sig(v):
-        bits = (planes @ v) > 0
-        return set(int(x) for x in ((bits * weights).sum(axis=1) + offsets))
-
-    sigs = [[sig(v) for v in g] for g in vectors_by_group]
-    same_hit = same_n = 0
-    for g in sigs:
-        for a, b in itertools.combinations(g, 2):
-            same_n += 1
-            same_hit += bool(a & b)
-    diff_hit = diff_n = 0
-    for gi, gj in itertools.combinations(range(len(sigs)), 2):
-        for a in sigs[gi]:
-            for b in sigs[gj]:
-                diff_n += 1
-                diff_hit += bool(a & b)
-    return same_hit / same_n, diff_hit / diff_n
-
-
 def main() -> int:
     emb = get_embedder(os.environ.get("RETRACT_EMBEDDER", "local"))
     print(f"embedder: {emb.name}\n")
@@ -124,21 +97,6 @@ def main() -> int:
         thresh = (max(same) + ceiling) / 2
         print(f"\nSAFE THRESHOLD: {thresh:.2f}   (margin below {ceiling:.3f}, above {max(same):.3f})")
 
-    print(f"\n{'k':>3} {'L':>4} {'TRUE':>8} {'FALSE':>8}")
-    best = None
-    for k in (6, 8, 10, 12, 14):
-        for L in (8, 16, 32, 64):
-            t, f = lsh_rates(vecs, k, L)
-            if t >= 0.99 and (best is None or (f, L) < (best[3], best[1])):
-                best = (k, L, t, f)
-            print(f"{k:>3} {L:>4} {t:>7.1%} {f:>8.1%}")
-
-    print()
-    if best:
-        print(f"CHOSEN ON REAL GEOMETRY: BITS_PER_TABLE={best[0]}, NUM_TABLES={best[1]}")
-        print(f"  true {best[2]:.1%}, false {best[3]:.1%}, {best[1]} locks/commit")
-    else:
-        print("NO (k,L) REACHES 99% TRUE COLLISION ON REAL EMBEDDINGS.")
     if thresh:
         print(f"CHOSEN dup_threshold: {thresh:.2f}")
     return 0

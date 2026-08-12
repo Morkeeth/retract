@@ -39,8 +39,8 @@ import numpy as np
 import psycopg
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from retract.engine import MemoryEngine, vec_literal  # noqa: E402
-from retract.lsh import DIM, primary_bucket  # noqa: E402
+from retract.embed import DIM  # noqa: E402
+from retract.engine import MemoryEngine  # noqa: E402
 
 rng = np.random.default_rng(42)
 
@@ -50,11 +50,11 @@ def unit(seed: int) -> np.ndarray:
     return v / np.linalg.norm(v)
 
 
-def write(eng: MemoryEngine, emb, content, derived_from=()) -> uuid.UUID:
-    rr = eng.read(emb)
-    res = eng.commit(emb, content, rr, derived_from=derived_from)
+def write(eng: MemoryEngine, emb, content, subject, predicate, derived_from=()) -> uuid.UUID:
+    eng.read(emb)                      # READ phase, as a real turn would
+    res = eng.commit(emb, content, subject, predicate, derived_from=derived_from)
     if res.memory_id is None:
-        raise RuntimeError(f"unexpected conflict writing {content!r}")
+        raise RuntimeError(f"unexpected {res.outcome} writing {content!r}")
     return res.memory_id
 
 
@@ -73,11 +73,19 @@ def main() -> int:
     scope = f"cascade-{uuid.uuid4().hex[:8]}"
     eng = MemoryEngine(url, scope, "support-agent")
 
-    m1 = write(eng, unit(1), "Customer 4471 verified their identity via passport.")
-    m2 = write(eng, unit(2), "Customer 4471 is eligible for instant refunds.", [m1])
-    m3 = write(eng, unit(3), "Refund of $1,240 to customer 4471 is approved.", [m2])
-    m4 = write(eng, unit(4), "Customer 4471 qualifies for priority support.", [m1])
-    m5 = write(eng, unit(5), "Customer 9902 verified their identity.")
+    # Distinct (subject, predicate) per belief -- same key would be a contradiction,
+    # which is a different test. Unit vectors stand in for embeddings: this eval is
+    # about the DAG and the effect ledger, not about retrieval.
+    m1 = write(eng, unit(1), "Customer 4471 verified their identity via passport.",
+               "Customer 4471", "identity verified")
+    m2 = write(eng, unit(2), "Customer 4471 is eligible for instant refunds.",
+               "Customer 4471", "refund eligibility", [m1])
+    m3 = write(eng, unit(3), "Refund of $1,240 to customer 4471 is approved.",
+               "Customer 4471", "refund approval", [m2])
+    m4 = write(eng, unit(4), "Customer 4471 qualifies for priority support.",
+               "Customer 4471", "support tier", [m1])
+    m5 = write(eng, unit(5), "Customer 9902 verified their identity.",
+               "Customer 9902", "identity verified")
 
     e_refund = add_effect(url, scope, m3, "refund_issued", "rf-4471-1240", "executed")
     e_tier = add_effect(url, scope, m4, "tier_upgrade", "tu-4471", "pending")
