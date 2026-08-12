@@ -1,221 +1,249 @@
-# RETRACT — endgame plan
+# RETRACT — the merged endgame plan
 
-My independent answer to the same six questions posed to the other models.
-Written 12 Aug, deadline 18 Aug 23:00 CEST. ~5.5 working days.
+Synthesised 12 Aug from five independent plans (Codex, Grok, Cursor, Fable, and
+my own). Deadline 18 Aug 23:00 CEST.
+
+This supersedes my first draft. Where I changed position, I say so and why.
 
 ---
 
-## 1. Where this is weakest
+## What all five agreed on (so it is settled, not clever)
 
-Scored honestly against the five criteria, 20% each.
+1. **Deploy + public repo first.** Unanimous, 5/5. They are pass/fail gates worth
+   100% of eligibility, not 20% of a criterion.
+2. **The LangGraph adapter is not the top move.** Also 5/5 — including me, who had
+   argued for it earlier in the day and reversed before seeing the others.
+3. **Cut multi-tenancy.** Unanimous. Costs a day, moves nothing a judge sees.
+4. **Never imply Claude adjudicated when the heuristic ran.** Unanimous, and it is
+   the fastest way to lose Technical Implementation.
 
-| Criterion | Estimate | Why |
+Unanimity means obvious, not differentiating. The plan below is decided by the
+disagreements.
+
+---
+
+## Where I changed my mind
+
+### Deploy on AWS App Runner, not Fly.io
+
+I said Fly. **Fable's argument beats mine:** App Runner upgrades the "AWS services
+used" statement from one service to two, and that statement is a scored deliverable
+in a hackathon co-sponsored by AWS. Fly is marginally faster and throws that away.
+Cursor and Grok independently reached App Runner for the same optics reason.
+
+Same region as the cluster (eu-west-1), container from ECR, **IAM instance role so
+there are zero AWS keys in the environment**. Fly stays the fallback if App Runner
+is not green by end of Day 1 — the gate is a working URL, not a particular host.
+
+### Hardening is not third. It is the best score-per-hour on the board.
+
+Every plan ranked Production Readiness as the weakest or second-weakest criterion,
+then ranked hardening 3rd or 4th. That is inconsistent, and I made the same mistake.
+
+Codex scored it **9/20**. It is a full 20% of the total, it is the cheapest axis to
+move, and a half-day of unglamorous work takes it to roughly 16. Nothing else on the
+list converts hours to points at that rate — not the adapter, not a new surface, not
+another eval.
+
+It also has a floor nobody else stated plainly: **an unauthenticated public endpoint
+holding live database credentials and a Bedrock spend path does not score zero on
+Production Readiness. It scores negative.** Fable is right that it is an
+anti-pattern a sponsor engineer probes in thirty seconds.
+
+### Do not build a contradiction feed
+
+I had it at #5, Codex at #2. **Fable's counter wins:** act 3 of the existing demo
+already shows a contradiction being raised and adjudicated. A new surface costs a
+day and pushes the video past three minutes. Sharpen the act that exists instead.
+
+---
+
+## The thing all five of us missed, and it is the best move left
+
+**Execute one compensation, on camera.**
+
+Fable flagged the wording — *"a flag nobody watches fire is a claim, not a control"*
+— but nobody made it a plan item. Every plan treats `needs_compensation` as
+finished.
+
+It is the single most original thing in the project. Every agent framework can
+delete a memory. **None can tell you what that memory already caused, and none can
+undo it.** Right now we stop one step short: we identify the executed refund and
+flag it. We do not reverse it.
+
+Closing that loop is roughly two hours — a compensation handler per tool type, an
+idempotency key on the reversal so it cannot double-fire, and the ledger showing
+`refund_issued → needs_compensation → compensated` with the reversal's own id.
+
+It converts the strongest claim in the submission from *"we can find the damage"*
+to *"we undo it, transactionally, and here is the receipt."* That is the sentence
+the video ends on.
+
+---
+
+## The hostile-read pass — Fable's list, which is the highest-value critique received
+
+Fix the words, not the code. Each of these is a sponsor engineer's 30-second probe.
+
+| Claim we make | The problem | The fix |
 |---|---|---|
-| Agentic Memory Design | **strong** | claim key, bitemporal rows, derivation DAG, effect ledger, contradiction table |
-| Technical Implementation | **strong, with a wound** | measured negatives, durable locking, 9 refused attack payloads — but see the dead code below |
-| **Real-World Impact** | **weakest** | no user. The scenario is invented. Customer 4471 does not exist |
-| **Production Readiness** | **second weakest** | no deployment at all, no auth, `scope` is an unenforced string, no metrics |
-| Creativity & Originality | **strong** | a negative result as the centrepiece; the palette device |
-
-### The wound, and it is self-inflicted
-
-`schema.sql` still documents `memory_bucket` as *"the lock target, and the heart of
-the design"*. It is not. `claim_key` is. The engine never touches `memory_bucket`,
-the table is still live on the cluster, `retract/lsh.py` is imported by nothing in
-the correctness path, and it declares `DIM = 384` while the embedder now runs at
-512 — which `experiments/cascade.py` still imports.
-
-A judge who reads the schema finds a table described as the heart of a design the
-code abandoned. That does more damage than any missing feature: it makes every
-other claim in the README suspect. **Delete it on day 1, before anything else.**
-
-### The multi-tenancy hole nobody has looked at
-
-`scope` is a string passed by the caller. Nothing enforces it. Any agent can read
-or write any other tenant's memory by passing a different string. For a product
-whose entire pitch is *governed* shared memory, that is the question a Production
-Readiness judge asks first, and we currently have no answer.
+| "durable lock" | CockroachDB locks are released at transaction end. A Cockroach engineer will read this as a claim about lock lifetime that we do not make. | Say **"a lock row taken inside the commit transaction, with durable locking enabled so a lease transfer cannot drop it"**. Precise and checkable. |
+| "exactly one agent decides" | What if the holder crashes mid-hold? | Verify and then state it: the lock is held only inside a short transaction, so a crash aborts it and the key frees immediately. **No lease, no TTL, no wedge.** That is a feature — write it down. |
+| "9 attack payloads refused" | Refused *by which layer*? | Be exact: the endpoint's `select_query` tool validates the statement and rejects non-SELECT. MCP does expose `create_table` / `insert_rows`, so **"structurally impossible to write"** is too strong — the true claim is that the lock cannot be expressed through MCP, so writes never route there. |
+| the 8-vs-1 eval | Reads as a strawman unless the naive arm is identical infra minus the lock. | It is — same cluster, same table, same embeddings, no claim key. **State that explicitly in the README.** |
+| "compensation" | Implies closed-loop sagas that do not exist. | Either build it (see above) or say "flagged for compensation; the handler is out of scope". Do not leave it ambiguous. |
 
 ---
 
-## 2. Day by day
+## Day by day
 
-Each day has one outcome, one observable check, and a named cut.
+Each day: one outcome, one observable check, one named cut.
 
-### Day 1 (13 Aug) — DEPLOY, and delete the lie
+### Day 1 — Wed 13 · The submission becomes hittable
 
-**Outcome:** a public URL a stranger can press buttons on, and a repo whose docs
-describe the code that exists.
-
-Deploy first, not last. It is the only hard deliverable still unmet, it is the one
-that cannot be faked at 22:00 on the 18th, and every team that leaves it to the end
-loses a day to it. Everything after this is upside; this is survival.
+**Outcome:** public repo, deployed URL, and a repo whose docs describe the code.
 
 - Delete `retract/lsh.py`, `experiments/probe_lsh.py`, the `memory_bucket` table and
-  its section in `schema.sql`. Fix `cascade.py`'s import. Re-run all evals.
-- Deploy the FastAPI app. Fly.io or Railway — both take a Dockerfile and a secret,
-  both give a URL in minutes. Not Lambda: the app holds a warm embedder and a
-  connection pool, and cold starts would make the demo feel broken.
-- Put the repo public with the Apache-2.0 licence visible in the About section.
+  its section in `schema.sql`. It is currently documented as *"the lock target, and
+  the heart of the design"* and the engine never touches it. Fix `cascade.py`'s
+  stale 384-dim import. Re-run all evals.
+- **Scope the AWS key down before it goes anywhere near a public host.** It carries
+  `AdministratorAccess` today. App Runner gets an instance role with
+  `bedrock:InvokeModel` on the two model ARNs and nothing else.
+- Separate CockroachDB demo database and least-privilege SQL user. No DDL, no admin.
+- Deploy. Public repo with the Apache-2.0 licence visible in the About panel.
+- Submit the Anthropic use-case form once, then stop thinking about it.
 
-**Check:** open the URL on a phone, on cellular, logged out. Press both buttons.
-Both complete. *(This is the `/stranger` test: I cannot see my own first run.)*
+**Check:** incognito, on cellular, on a phone. All four acts complete against live
+transactions. Fresh `git clone` follows the README to a running local instance.
 
-**Cut if long:** the repo can go public on day 2. The URL cannot.
+**Cut if long:** nothing. This day is the gate.
 
-### Day 2 (14 Aug) — REAL DATA. The impact fix.
+### Day 2 — Thu 14 · The demo stops being an open wallet
 
-**Outcome:** RETRACT catches contradictions between agents that actually exist.
+**Outcome:** Production Readiness moves from its weakest score to a defensible one.
 
-This is the move I would defend hardest, and it is *not* the LangGraph adapter —
-see section 3.
+- Shared demo token or Cloudflare Access in front of any write path.
+- Per-IP rate limits on THINK/COMMIT. Request-size cap. Per-request timeout.
+- **Preset scenarios only** (Codex): three or four server-side scenario IDs, no
+  arbitrary user text reaching an embedding or a model call. Kills prompt injection
+  into an expensive path and bounds spend by construction.
+- AWS Budgets alarm with a kill threshold; max-token caps on every invoke.
+- `/healthz` and a non-sensitive `/status` showing database, adjudication mode, and
+  build SHA (Codex).
+- Structured logs: request id, claim id, adjudication mode, lock outcome, cascade
+  count, error class. **Never** connection strings or raw prompts.
+- A `SECURITY.md` naming the blast radius honestly: what is proven (MCP writes
+  refused, serializable commit, compensation ledger) and what is demo scaffolding.
 
-Oscar runs a fleet: multiple Claude sessions writing about shared projects, which
-genuinely disagree with each other. Point RETRACT at it. Each session asserts claims
-about project state (`project:retract · gate_1_status`, `project:favour · deploy_state`)
-and RETRACT adjudicates the collisions.
+**Check:** ungated write fails; gated four-act demo still works; a burst of 100
+commits returns 429; hammering the URL does not move the Bedrock bill past the cap.
 
-Structural facts only — project names, statuses, decisions. No journal, no finance,
-no wallet data, per the standing boundary.
+**Cut if long:** the observability panel. Stdout JSON logs plus a README section is
+enough.
 
-**Check:** a number that was not invented. *"Pointed at our own agent fleet for one
-night: N contradictions caught, M were real disagreements."* If N is zero, say so —
-a null result here is still a real measurement and still beats a fictional customer.
+### Day 3 — Fri 15 · Close the compensation loop, then the honesty pass
 
-**Cut if long:** run it on the transcript archive rather than live.
+**Outcome:** the most original claim in the project becomes a demonstrated control,
+and every overclaim is removed from the copy.
 
-### Day 3 (15 Aug) — PRODUCTION READINESS, then shoot a complete rough video
+- **Execute one compensation.** `refund_issued → needs_compensation → compensated`,
+  with the reversal carrying its own idempotency key, visible in the effect ledger
+  on the deployed URL.
+- Run the hostile-read table above across README, FINDINGS, DEMO and the UI copy.
+- Adjudicator honesty lock: Claude live, or the UI and every document say
+  "heuristic stand-in; Claude adapter wired, pending Amazon use-case approval."
+  Never a silent substitute.
 
-**Outcome:** the second-weakest criterion answered, and a submittable video existing
-three days early.
+**Check:** on the public URL, retract a forged-passport belief and watch a real
+reversal execute and land in the ledger. Grep the repo for every phrase in the
+hostile-read table; each one is either fixed or footnoted.
 
-- Enforce `scope`. A tenant token, checked on every engine call, so a caller cannot
-  read a scope it was not issued. This is the answer to the question above.
-- Auth on the demo, even a shared token, so the deployed URL is not an open write
-  endpoint to a live database.
-- Emit metrics the audit log already implies: contradictions raised, adjudication
-  latency, retry counts. `show_running_queries` through MCP is a free observability
-  panel we already have access to.
-- **Then shoot the whole video, rough, with whatever exists.**
+**Cut if long:** the dogfood run below moves to Day 4's surplus.
 
-**Check:** a video file exists that could be submitted today without embarrassment.
+### Day 4 — Sat 16 · The video, shot against the deployed URL
 
-**Cut if long:** metrics. Never the video.
+**Outcome:** a complete, public, under-three-minute video that a cold viewer
+understands.
 
-### Day 4 (16 Aug) — THE CONTRADICTION FEED
+Structure, from `DEMO.md`: the 0.531/0.532 finding (30s) → 8 versus 1 (45s) →
+retraction reaching the executed refund **and reversing it** (60s) → MCP refusing a
+write (20s) → the URL (15s).
 
-**Outcome:** disagreement becomes the product surface, not an implementation detail.
+Shot against the deployed URL, never localhost. Grok, Cursor and Fable all
+independently insisted on this and they are right: a judge who sees `localhost:8117`
+in the address bar has watched a private demo.
 
-Open contradictions as a live stream: *these are the facts your fleet currently
-disagrees about.* It inverts the pitch from silent infrastructure to a dashboard
-with a number nobody else can produce — and by day 4 that number is populated by
-real fleet data from day 2 rather than a scripted demo.
+**Check:** plays without login, under 3:00, and someone who has never heard of this
+can say what it does afterwards.
 
-**Check:** the feed shows a contradiction that came from a real agent, not a fixture.
+**Cut if long:** second takes, music, B-roll, any brand intro over five seconds.
+Audio clarity beats production value.
 
-**Cut if long:** all of it. This is the first genuinely optional day.
+### Day 5 — Sun 17 · Stranger pass, then submit
 
-### Day 5 (17 Aug) — RESHOOT AND WRITE
+**Outcome:** submitted, complete, a full day early.
 
-Final video with Claude adjudication live. Devpost copy. Architecture diagram.
-Re-run every eval and paste real output into the README.
+- Written CockroachDB tools + AWS services statement.
+- `/stranger`: hand the repo, URL and video to someone who has never seen them.
+- Re-run every eval; paste real output into the README.
+- **Submit by 18:00 Sunday.** Not Monday.
 
-**Check:** a stranger who has never seen the repo can clone, run, and reach the
-same numbers.
+**Check:** a submission confirmation exists while a day of buffer remains.
 
-### Day 6 (18 Aug, to 23:00) — SUBMIT BY 18:00
+**Cut if long:** every fix below the line ships as-is.
 
-Five hours of buffer, deliberately unallocated. Submit early. The deadline is the
-one thing on this list that does not negotiate.
+### Day 6 — Mon 18 · Buffer, and the surplus move
+
+Only repair demonstrated failures. If — and only if — everything above is green:
+
+**The dogfood run.** Point RETRACT at Oscar's actual agent fleet: several Claude
+sessions writing structural claims about shared project state, which genuinely
+disagree. *"We ran it against our own agent fleet and it caught N real
+disagreements"* is a fact where every competitor has a story. Structural facts only
+— project names, statuses, decisions. Nothing from journal, finance or wallets.
+
+No other plan proposed this, and none argued against it, because none saw it. It is
+the highest-ceiling item left and the least certain, which is exactly why it belongs
+in surplus rather than on the critical path.
 
 ---
 
-## 3. Score per hour — and where I now disagree with myself
-
-Earlier today I said the LangGraph adapter was the top non-gate item. **I think that
-was wrong**, and the other models will probably say the same thing I did, so this is
-where an independent answer earns its keep.
+## Score per hour, final ranking
 
 | Rank | Work | Why |
 |---|---|---|
-| 1 | Deploy | pass/fail. A missing demo URL is an incomplete submission, not a weak one |
-| 2 | Delete the dead v1 code | costs an hour, removes a credibility wound that taints everything |
-| 3 | Real fleet data | converts the weakest 20% from fiction to fact |
-| 4 | Scope enforcement + auth | the first question a Production Readiness judge asks |
-| 5 | Contradiction feed | the strongest *product* move, but only after 3 makes it real |
-| 6 | LangGraph adapter | good, and beaten by 3 |
-
-**Why the adapter loses to dogfooding.** An adapter is *evidence that someone could*
-use this. Real fleet data is *evidence that someone did*. The judging criterion says
-"how big of an impact could the project have on real users or workflows" — a judge
-reading "we pointed it at our own agent fleet and it caught N real disagreements"
-gets a fact. A judge reading "implements the LangGraph memory interface" gets an
-integration they will not run. And the adapter costs a day; the dogfood costs half
-of one, because the fleet already exists.
-
-The honest counter-argument: an adapter is *reusable* and dogfooding is *anecdote*.
-If day 2 finishes early, build the adapter too — but not first.
+| 1 | Public repo + deployed URL | Pass/fail. Without it every other number is an anecdote |
+| 2 | Delete the dead v1 code | One hour; removes a wound that taints every other claim |
+| 3 | Harden the demo | Cheapest 20% on the board: ~9/20 → ~16/20 in half a day |
+| 4 | Execute one compensation | Converts the most original claim from a flag to a control |
+| 5 | Hostile-read wording pass | Free. Prevents the specific deductions a sponsor engineer makes |
+| 6 | Video against the deployed URL | Gate, and the only channel Creativity is scored through |
+| 7 | Dogfood on the real fleet | Highest ceiling, lowest certainty. Surplus only |
+| 8 | LangGraph adapter | Real engineering, weak judging leverage. After submit, or never |
+| 9 | Contradiction feed | Act 3 already shows it. Cut |
+| 10 | Multi-tenancy | Unanimous cut |
 
 ---
 
-## 4. The deploy decision
+## Hard internal deadlines
 
-FastAPI, holds a warm embedding model, a psycopg connection to CockroachDB Cloud,
-and calls Bedrock. It is a stateful long-running process, not a function.
-
-**Fly.io.** Dockerfile, `fly secrets set`, a URL in under an hour, and a persistent
-machine that keeps the embedder warm. Railway is the equivalent second choice.
-**Not Lambda** — the ~8s cold start on the embedder would make a judge's first click
-feel like a broken page, and first impressions are the entire game in a 3-minute
-review.
-
-**The security implications, named plainly, because the deployed thing holds live
-credentials and anyone can hit it:**
-
-- The demo writes to a real cluster. Every visitor's run inserts rows. Mitigate with
-  a per-visit scope and a row-level TTL so the table self-cleans, plus a rate limit.
-- Bedrock calls cost money and the endpoint is public. Cap it: a request budget per
-  IP per hour, and a hard daily ceiling that degrades to the local model rather than
-  spending without bound.
-- `CRDB_URL` and the AWS keys go in the platform's secret store, never the image.
-- The AWS key currently carries `AdministratorAccess`. **Scope it down before deploy**
-  to Bedrock-invoke only. A public endpoint holding an admin key is the single worst
-  thing in this plan if left as is.
-- Delete the IAM user after 18 Aug.
+- **Wed 13, 20:00** — public URL responds, repo public.
+- **Fri 15, 18:00** — feature freeze. Nothing new after this.
+- **Sat 16, 20:00** — video recorded and uploaded.
+- **Sun 17, 18:00** — submitted.
+- **Mon 18** — repair only.
 
 ---
 
-## 5. What I would cut
+## The biggest risk
 
-- **`lsh.py`, `probe_lsh.py`, `memory_bucket`.** Not deprioritised — deleted. They
-  describe a design the code abandoned. Cost of keeping: every other claim looks
-  less reliable.
-- **The `AS OF SYSTEM TIME` fast path.** Vestigial. The audit substrate is explicit
-  rows and the 4-hour GC window makes time travel a footnote. Keeping it invites a
-  question we gain nothing by answering.
-- **The Agent Skills repo integration.** Both gates are met. It would be a third
-  tool for its own sake.
-- **Multi-region anything.** Correct, expensive, and invisible on camera — documented
-  failover is ~4.5s of nothing happening.
-- **Further work on the heuristic adjudicator.** Once Claude is live it is a fallback,
-  not a feature. Freeze it.
+Not the build. **The video, and its dependency on the URL.**
 
----
+It cannot be parallelised, cannot be delegated, needs everything else finished, and
+is what every team leaves to the final night — which is exactly when the demo
+breaks, the cluster throttles, or the recording fails.
 
-## 6. The biggest risk, and the mitigation
-
-**Not the build. The video.**
-
-It is the only deliverable that needs a contiguous uninterrupted block, cannot be
-parallelised, cannot be delegated, and depends on everything else being finished
-first. It is also the one every team leaves until the last night, which is exactly
-why the last night is when the demo breaks.
-
-**Mitigation: shoot a complete, submittable rough cut on day 3**, with the heuristic
-adjudicator if Claude is still gated. From that moment a valid submission exists and
-every further day is optional improvement rather than a race.
-
-**Second risk:** the Anthropic use-case form is the only thing between the video and
-a labelled stand-in appearing in the final take. It is a one-screen console form and
-it is not mine to fill. If it is not done by day 3, shoot with the stand-in and
-reshoot only the 30 seconds that show the verdict box.
+Mitigation is structural and already in the plan: deploy on Day 1, shoot against the
+deployed URL on Day 4, and have a complete submission by Sunday evening so Monday is
+upgrade time and never rescue time.

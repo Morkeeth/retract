@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RETRACT — Direction 1 · Indistinguishable until read</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200;12..96,500;12..96,800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  /* =====================================================================
+     DIRECTION 1 — Indistinguishable until read
+     Signature device (preserved, elevated): --sig-para and --sig-neg differ
+     by the same margin their embeddings do (L2 0.531 vs 0.532). The colour
+     change after adjudication IS the information. Brand builds around it:
+     every unresolved claim wears both colours stacked; only a verdict splits them.
+     ===================================================================== */
+
+  :root {
+    color-scheme: light dark;
+
+    --ground:     oklch(0.97 0.012 208);
+    --ground-2:   oklch(0.935 0.014 208);
+    --ground-3:   oklch(0.90 0.016 208);
+    --line:       oklch(0.82 0.018 208);
+    --ink:        oklch(0.22 0.028 208);
+    --ink-dim:    oklch(0.48 0.018 208);
+
+    /* THE DEVICE — one thousandth apart. Do not "fix" these. */
+    --sig-para:   oklch(0.62 0.114 196);
+    --sig-neg:    oklch(0.619 0.115 196.4);
+
+    /* After adjudication they finally diverge */
+    --resolved-para: oklch(0.62 0.145 168);
+    --resolved-neg:  oklch(0.58 0.185 26);
+
+    --corrupt:    oklch(0.55 0.195 26);
+    --ok:         oklch(0.55 0.130 168);
+
+    --mark-stack-gap: 1px; /* the visual of 0.001 — literally one pixel */
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:     oklch(0.16 0.021 208);
+      --ground-2:   oklch(0.204 0.024 208);
+      --ground-3:   oklch(0.24 0.026 208);
+      --line:       oklch(0.30 0.020 208);
+      --ink:        oklch(0.94 0.008 208);
+      --ink-dim:    oklch(0.66 0.014 208);
+
+      --sig-para:   oklch(0.72 0.114 196);
+      --sig-neg:    oklch(0.719 0.115 196.4);
+      --resolved-para: oklch(0.78 0.150 168);
+      --resolved-neg:  oklch(0.66 0.190 26);
+      --corrupt:    oklch(0.62 0.212 26);
+      --ok:         oklch(0.80 0.140 168);
+    }
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; min-width: 0 }
+  html, body { max-width: 100%; overflow-x: hidden }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 200;
+    font-size: 15px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  .mono { font-family: 'JetBrains Mono', monospace }
+
+  /* ---- shell ---- */
+  .shell {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: clamp(20px, 3.5vw, 48px);
+  }
+
+  /* ---- wordmark ---- */
+  .brand {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 48px;
+    flex-wrap: wrap;
+  }
+  .wordmark {
+    position: relative;
+    display: inline-block;
+    font-size: clamp(28px, 4vw, 36px);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1;
+  }
+  /* Dual underline: para + neg stacked 1px apart — reads as one until you look */
+  .wordmark::after,
+  .wordmark::before {
+    content: '';
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px;
+    bottom: -6px;
+  }
+  .wordmark::before { background: var(--sig-para); }
+  .wordmark::after  { background: var(--sig-neg); bottom: calc(-6px - var(--mark-stack-gap)); }
+
+  .meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-dim);
+    letter-spacing: 0.04em;
+    text-align: right;
+    line-height: 1.8;
+  }
+  .meta b { color: var(--ink); font-weight: 400 }
+
+  /* ---- page head ---- */
+  .page-head { margin-bottom: 36px; max-width: 52ch }
+  .page-head h1 {
+    font-size: clamp(32px, 5.5vw, 56px);
+    font-weight: 800;
+    letter-spacing: -0.045em;
+    line-height: 0.95;
+    margin-bottom: 14px;
+  }
+  .page-head p { color: var(--ink-dim); font-size: 16px; max-width: 46ch }
+
+  /* ---- legend: the device explained in colour, not prose ---- */
+  .device-strip {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    margin-bottom: 28px;
+  }
+  @media (max-width: 720px) { .device-strip { grid-template-columns: 1fr } }
+  .device-cell {
+    background: var(--ground-2);
+    padding: 16px 18px;
+  }
+  .device-cell .lbl {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 10px;
+  }
+  .swatch-row { display: flex; align-items: center; gap: 12px }
+  .swatch {
+    width: 48px; height: 48px;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .swatch .a, .swatch .b {
+    position: absolute; inset: 0;
+  }
+  .swatch .a { background: var(--sig-para) }
+  .swatch .b { background: var(--sig-neg); clip-path: inset(0 0 0 50%) }
+  .swatch.resolved .a { background: var(--resolved-para) }
+  .swatch.resolved .b { background: var(--resolved-neg) }
+  .swatch-copy { font-size: 13px; color: var(--ink-dim); line-height: 1.45 }
+  .swatch-copy strong { color: var(--ink); font-weight: 500 }
+  .swatch-copy .d {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    display: block;
+    margin-top: 4px;
+  }
+
+  /* ---- race panes ---- */
+  .section-label {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 8px;
+  }
+  .lede { color: var(--ink-dim); margin-bottom: 22px; max-width: 62ch }
+
+  .panes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+  }
+  @media (max-width: 820px) { .panes { grid-template-columns: 1fr } }
+
+  .pane {
+    background: var(--ground-2);
+    padding: 22px 20px 24px;
+    min-height: 520px;
+    display: flex;
+    flex-direction: column;
+  }
+  .pane h3 {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+  .pane .impl {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    color: var(--ink-dim);
+    margin: 4px 0 22px;
+  }
+
+  .big {
+    font-size: clamp(64px, 10vw, 112px);
+    font-weight: 800;
+    line-height: 0.85;
+    letter-spacing: -0.05em;
+    font-variant-numeric: tabular-nums;
+  }
+  .big.bad { color: var(--corrupt) }
+  .big.good { color: var(--ok) }
+  .biglabel {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-top: 10px;
+  }
+
+  .stats {
+    display: flex;
+    gap: 30px;
+    margin-top: 22px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+  }
+  .stat .n {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+  }
+  .stat .l {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-top: 3px;
+  }
+
+  /* Claim rows — colour IS the adjudication state */
+  .claims {
+    margin-top: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    flex: 1;
+  }
+  .claim {
+    background: var(--ground);
+    padding: 10px 12px;
+    display: grid;
+    grid-template-columns: 56px 1fr auto;
+    gap: 12px;
+    align-items: baseline;
+  }
+  .claim .agent {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-dim);
+  }
+  .claim .text { font-size: 13px; font-weight: 500; line-height: 1.35 }
+  .claim .key {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-dim);
+    text-align: right;
+  }
+
+  /* Unresolved = stacked dual mark (indistinguishable) */
+  .claim .mark {
+    width: 8px; height: 8px;
+    display: inline-block;
+    margin-right: 6px;
+    vertical-align: middle;
+    position: relative;
+  }
+  .claim .mark::before,
+  .claim .mark::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+  .claim.unresolved .mark::before { background: var(--sig-para) }
+  .claim.unresolved .mark::after  { background: var(--sig-neg); clip-path: inset(0 0 0 50%) }
+  .claim.belief .mark::before,
+  .claim.belief .mark::after { background: var(--resolved-para); clip-path: none }
+  .claim.contradiction .mark::before,
+  .claim.contradiction .mark::after { background: var(--resolved-neg); clip-path: none }
+
+  .claim.belief .text { color: var(--resolved-para) }
+  .claim.contradiction .text { color: var(--ink-dim) }
+  .claim.unresolved .text { color: var(--sig-para) } /* same as neg — you can't tell */
+
+  .claim .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    grid-column: 2 / -1;
+    margin-top: -4px;
+  }
+  .claim.belief .tag { color: var(--resolved-para) }
+  .claim.contradiction .tag { color: var(--resolved-neg) }
+  .claim.unresolved .tag { color: var(--ink-dim) }
+
+  .punch {
+    margin-top: 22px;
+    font-size: 16px;
+    max-width: 64ch;
+  }
+  .punch b { color: var(--corrupt); font-weight: 500 }
+
+  footer {
+    margin-top: 48px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-dim);
+    line-height: 1.9;
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="brand">
+    <div class="wordmark" aria-label="RETRACT">RETRACT</div>
+    <div class="meta">
+      embedder <b>all-MiniLM-L6-v2</b><br>
+      pair Δ <b>0.001</b> · L2 0.531 / 0.532<br>
+      dir <b>1 · indistinguishable until read</b>
+    </div>
+  </div>
+
+  <header class="page-head">
+    <h1>Eight agents.<br>One fact.<br>Look at the colour first.</h1>
+    <p>Before anyone decides what a claim is, paraphrase and negation wear the same ink. Distance could not separate them. Neither can you.</p>
+  </header>
+
+  <div class="device-strip" aria-label="Signature colour device">
+    <div class="device-cell">
+      <div class="lbl">Before adjudication</div>
+      <div class="swatch-row">
+        <div class="swatch" title="para and neg stacked">
+          <div class="a"></div><div class="b"></div>
+        </div>
+        <div class="swatch-copy">
+          <strong>paraphrase ≡ negation</strong>
+          <span class="d">oklch ΔL 0.001 · Δh 0.4° — same margin as the embeddings</span>
+        </div>
+      </div>
+    </div>
+    <div class="device-cell">
+      <div class="lbl">After adjudication</div>
+      <div class="swatch-row">
+        <div class="swatch resolved">
+          <div class="a"></div><div class="b"></div>
+        </div>
+        <div class="swatch-copy">
+          <strong>belief ≠ contradiction</strong>
+          <span class="d">hue 168 vs hue 26 — only a read makes them diverge</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="section-label">02 — Eight agents, one fact, at the same moment</p>
+  <p class="lede">Each agent phrases verification differently and spells the customer differently.
+    There is one fact in the world. A correct memory ends holding one belief.
+    Colour on the left never splits — nothing adjudicated. Colour on the right does.</p>
+
+  <div class="panes">
+    <!-- NAIVE -->
+    <div class="pane">
+      <h3>Naive shared memory</h3>
+      <p class="impl">read → think → insert</p>
+      <div class="big bad">8</div>
+      <div class="biglabel">beliefs held about one fact</div>
+      <div class="stats">
+        <div class="stat"><div class="n">8</div><div class="l">claim keys</div></div>
+        <div class="stat"><div class="n">0</div><div class="l">contradictions seen</div></div>
+      </div>
+      <div class="claims">
+        <div class="claim unresolved">
+          <span class="agent">agent-0</span>
+          <span class="text"><span class="mark"></span>Customer 4471 verified via passport</span>
+          <span class="key">Customer 4471</span>
+          <span class="tag">INSERTED · treated as new</span>
+        </div>
+        <div class="claim unresolved">
+          <span class="agent">agent-1</span>
+          <span class="text"><span class="mark"></span>ID verification complete for cust 4471</span>
+          <span class="key">cust 4471</span>
+          <span class="tag">INSERTED · treated as new</span>
+        </div>
+        <div class="claim unresolved">
+          <span class="agent">agent-2</span>
+          <span class="text"><span class="mark"></span>4471 passed passport check</span>
+          <span class="key">4471</span>
+          <span class="tag">INSERTED · treated as new</span>
+        </div>
+        <div class="claim unresolved">
+          <span class="agent">agent-3</span>
+          <span class="text"><span class="mark"></span>CUSTOMER#4471 identity confirmed</span>
+          <span class="key">CUSTOMER#4471</span>
+          <span class="tag">INSERTED · treated as new</span>
+        </div>
+        <div class="claim unresolved">
+          <span class="agent">agent-4</span>
+          <span class="text"><span class="mark"></span>passport verified — customer 4471</span>
+          <span class="key">customer 4471</span>
+          <span class="tag">INSERTED · treated as new</span>
+        </div>
+        <div class="claim unresolved">
+          <span class="agent">agent-5</span>
+          <span class="text"><span class="mark"></span>4471: verification status OK</span>
+          <span class="key">4471:</span>
+          <span class="tag">INSERTED · treated as new</span>
+        </div>
+        <div class="claim unresolved">
+          <span class="agent">agent-6</span>
+          <span class="text"><span class="mark"></span>Cust.4471 has verified identity</span>
+          <span class="key">Cust.4471</span>
+          <span class="tag">INSERTED · treated as new</span>
+        </div>
+        <div class="claim unresolved">
+          <span class="agent">agent-7</span>
+          <span class="text"><span class="mark"></span>identity verification done (4471)</span>
+          <span class="key">(4471)</span>
+          <span class="tag">INSERTED · treated as new</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RETRACT -->
+    <div class="pane">
+      <h3>RETRACT</h3>
+      <p class="impl">read → think → lock claim key → adjudicate → write</p>
+      <div class="big good">1</div>
+      <div class="biglabel">beliefs held about one fact</div>
+      <div class="stats">
+        <div class="stat"><div class="n">1</div><div class="l">claim keys</div></div>
+        <div class="stat"><div class="n">7</div><div class="l">contradictions raised</div></div>
+      </div>
+      <div class="claims">
+        <div class="claim belief">
+          <span class="agent">agent-0</span>
+          <span class="text"><span class="mark"></span>Customer 4471 verified via passport</span>
+          <span class="key">cust_4471 · id_verified</span>
+          <span class="tag">BELIEF · incumbent</span>
+        </div>
+        <div class="claim contradiction">
+          <span class="agent">agent-1</span>
+          <span class="text"><span class="mark"></span>ID verification complete for cust 4471</span>
+          <span class="key">cust_4471 · id_verified</span>
+          <span class="tag">CONTRADICTION · L2 0.531 · paraphrase</span>
+        </div>
+        <div class="claim contradiction">
+          <span class="agent">agent-2</span>
+          <span class="text"><span class="mark"></span>4471 passed passport check</span>
+          <span class="key">cust_4471 · id_verified</span>
+          <span class="tag">CONTRADICTION · L2 0.487 · paraphrase</span>
+        </div>
+        <div class="claim contradiction">
+          <span class="agent">agent-3</span>
+          <span class="text"><span class="mark"></span>CUSTOMER#4471 identity confirmed</span>
+          <span class="key">cust_4471 · id_verified</span>
+          <span class="tag">CONTRADICTION · L2 0.512 · paraphrase</span>
+        </div>
+        <div class="claim contradiction">
+          <span class="agent">agent-4</span>
+          <span class="text"><span class="mark"></span>passport verified — customer 4471</span>
+          <span class="key">cust_4471 · id_verified</span>
+          <span class="tag">CONTRADICTION · L2 0.298 · paraphrase</span>
+        </div>
+        <div class="claim contradiction">
+          <span class="agent">agent-5</span>
+          <span class="text"><span class="mark"></span>4471: verification status OK</span>
+          <span class="key">cust_4471 · id_verified</span>
+          <span class="tag">CONTRADICTION · L2 0.604 · paraphrase</span>
+        </div>
+        <div class="claim contradiction">
+          <span class="agent">agent-6</span>
+          <span class="text"><span class="mark"></span>Cust.4471 has verified identity</span>
+          <span class="key">cust_4471 · id_verified</span>
+          <span class="tag">CONTRADICTION · L2 0.441 · paraphrase</span>
+        </div>
+        <div class="claim contradiction">
+          <span class="agent">agent-7</span>
+          <span class="text"><span class="mark"></span>identity verification done (4471)</span>
+          <span class="key">cust_4471 · id_verified</span>
+          <span class="tag">CONTRADICTION · L2 0.556 · paraphrase</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="punch">Same eight agents. Same cluster. Same instant. <b>8 beliefs</b> on the left — each in a colour you cannot tell from its opposite — <b>1 belief</b> on the right, seven contradictions the colour finally names.</p>
+
+  <footer>
+    Direction 1 · brand device = embedding finding encoded as palette<br>
+    Hue 196–208 (cold cyan / sea-glass): instrumentation, not product marketing. Chroma held low until adjudication raises it.<br>
+    Type: Bricolage Grotesque 200 / 500 / 800 · JetBrains Mono 400 / 700 for IDs and distances only.
+  </footer>
+</div>
+</body>
+</html>

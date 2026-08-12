@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RETRACT — Direction 2 · One seat at the claim</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;500;700&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  /* =====================================================================
+     DIRECTION 2 — One seat at the claim
+     Replaces the near-identical colour device.
+
+     Signature device: the CLAIM RAIL.
+     A single horizontal bar is the canonical (subject · predicate) lock.
+     Exactly one belief sits on it. Every other concurrent write hangs below
+     as a contradiction ticket clipped to the same rail. Eight spellings,
+     one key — the collapse is the picture, not a caption.
+
+     Why this beats the colour device (argument in the brief response):
+     the colour device encodes a finding about embeddings; the rail encodes
+     the mechanism RETRACT actually runs. A screenshot of a rail with
+     1 seated belief + 7 hanging tickets is product-specific without a logo.
+     ===================================================================== */
+
+  :root {
+    color-scheme: light dark;
+
+    /* Cool steel paper — not cream, not warm */
+    --ground:      oklch(0.965 0.008 250);
+    --ground-2:    oklch(0.94 0.010 250);
+    --ground-3:    oklch(0.90 0.012 250);
+    --line:        oklch(0.80 0.014 250);
+    --ink:         oklch(0.20 0.022 250);
+    --ink-dim:     oklch(0.48 0.016 250);
+
+    /* Rail / lock — deep audit green, bank-ledger lineage, not startup mint */
+    --rail:        oklch(0.42 0.095 155);
+    --rail-ink:    oklch(0.98 0.01 155);
+    --belief:      oklch(0.38 0.110 155);
+
+    /* Contradiction tickets — cool graphite, deliberately not "alert red" */
+    --ticket:      oklch(0.55 0.018 250);
+    --ticket-bg:   oklch(0.92 0.010 250);
+
+    /* Only corruption / executed residue gets hot chroma */
+    --corrupt:     oklch(0.52 0.195 28);
+    --ok:          oklch(0.42 0.110 155);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:      oklch(0.15 0.018 250);
+      --ground-2:    oklch(0.19 0.020 250);
+      --ground-3:    oklch(0.23 0.022 250);
+      --line:        oklch(0.30 0.016 250);
+      --ink:         oklch(0.93 0.008 250);
+      --ink-dim:     oklch(0.64 0.012 250);
+
+      --rail:        oklch(0.68 0.110 155);
+      --rail-ink:    oklch(0.14 0.02 155);
+      --belief:      oklch(0.78 0.120 155);
+
+      --ticket:      oklch(0.62 0.014 250);
+      --ticket-bg:   oklch(0.22 0.016 250);
+
+      --corrupt:     oklch(0.68 0.185 28);
+      --ok:          oklch(0.78 0.120 155);
+    }
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; min-width: 0 }
+  html, body { max-width: 100%; overflow-x: hidden }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-weight: 300;
+    font-size: 15px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  .mono { font-family: 'IBM Plex Mono', monospace }
+  .serif { font-family: 'IBM Plex Serif', serif }
+
+  .shell {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: clamp(20px, 3.5vw, 48px);
+  }
+
+  /* ---- wordmark: claim-key bar as the logo device ---- */
+  .brand {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 44px;
+    flex-wrap: wrap;
+  }
+  .wordmark-block { display: flex; flex-direction: column; gap: 0; }
+  .wordmark {
+    font-size: clamp(28px, 4vw, 34px);
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    line-height: 1;
+  }
+  /* The claim rail under the name — this IS the mark */
+  .claim-mark {
+    margin-top: 10px;
+    display: flex;
+    align-items: stretch;
+    height: 22px;
+    max-width: 320px;
+  }
+  .claim-mark .bar {
+    flex: 1;
+    background: var(--rail);
+    color: var(--rail-ink);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+  }
+  .claim-mark .seat {
+    width: 22px;
+    background: var(--rail);
+    border-left: 1px solid color-mix(in oklch, var(--rail-ink) 35%, transparent);
+    position: relative;
+  }
+  .claim-mark .seat::after {
+    content: '';
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 6px; height: 6px;
+    transform: translate(-50%, -50%);
+    background: var(--rail-ink);
+  }
+
+  .meta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-dim);
+    text-align: right;
+    line-height: 1.8;
+  }
+  .meta b { color: var(--ink); font-weight: 400 }
+
+  .page-head { margin-bottom: 32px; max-width: 54ch }
+  .page-head h1 {
+    font-size: clamp(30px, 5vw, 48px);
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    line-height: 1.02;
+    margin-bottom: 14px;
+  }
+  .page-head p { color: var(--ink-dim); font-size: 16px; font-weight: 300; max-width: 48ch }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 8px;
+  }
+  .lede { color: var(--ink-dim); margin-bottom: 24px; max-width: 64ch }
+
+  /* ---- split: naive chaos vs claim rail ---- */
+  .panes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+  }
+  @media (max-width: 900px) { .panes { grid-template-columns: 1fr } }
+
+  .pane-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 6px;
+  }
+  .pane-head h3 {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+  .pane-head .impl {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-dim);
+  }
+
+  .counts {
+    display: flex;
+    gap: 28px;
+    margin: 14px 0 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .count .n {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: clamp(42px, 7vw, 64px);
+    font-weight: 600;
+    line-height: 0.9;
+    letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums;
+  }
+  .count.bad .n { color: var(--corrupt) }
+  .count.good .n { color: var(--ok) }
+  .count .l {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-top: 8px;
+  }
+
+  /* ---- NAIVE: eight orphan keys, no rail ---- */
+  .orphan-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+  }
+  .orphan {
+    background: var(--ground-2);
+    padding: 11px 14px;
+    display: grid;
+    grid-template-columns: 52px 1fr;
+    gap: 10px;
+    align-items: start;
+  }
+  .orphan .agent {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-dim);
+    padding-top: 3px;
+  }
+  .orphan .belief-text {
+    font-family: 'IBM Plex Serif', serif;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.35;
+  }
+  .orphan .key-chip {
+    grid-column: 2;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--corrupt);
+    margin-top: 4px;
+  }
+
+  /* ---- RETRACT: the claim rail ---- */
+  .rail-stage {
+    border: 1px solid var(--line);
+    background: var(--ground-2);
+    padding: 18px 16px 20px;
+  }
+
+  .rail {
+    background: var(--rail);
+    color: var(--rail-ink);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 12px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .rail .lock-label {
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    opacity: 0.75;
+    font-weight: 400;
+  }
+
+  /* The one seated belief — flush under the rail, no gap that would float it */
+  .seated {
+    background: var(--ground);
+    border: 1px solid var(--rail);
+    border-top: 0;
+    padding: 14px 14px 16px;
+    display: grid;
+    grid-template-columns: 52px 1fr auto;
+    gap: 10px;
+    align-items: start;
+  }
+  .seated .agent {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-dim);
+    padding-top: 4px;
+  }
+  .seated .belief-text {
+    font-family: 'IBM Plex Serif', serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--belief);
+    line-height: 1.35;
+  }
+  .seated .seat-tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--belief);
+    padding-top: 4px;
+  }
+
+  /* Contradiction tickets — hang from the rail via a clip stem */
+  .tickets {
+    margin-top: 0;
+    padding: 0 8px 0 28px;
+    position: relative;
+  }
+  /* Vertical stem from rail into ticket stack */
+  .tickets::before {
+    content: '';
+    position: absolute;
+    left: 14px;
+    top: 0;
+    bottom: 18px;
+    width: 1px;
+    background: var(--line);
+  }
+
+  .ticket {
+    position: relative;
+    margin-top: 8px;
+    background: var(--ticket-bg);
+    border: 1px solid var(--line);
+    padding: 10px 12px;
+    display: grid;
+    grid-template-columns: 52px 1fr;
+    gap: 8px;
+  }
+  .ticket::before {
+    content: '';
+    position: absolute;
+    left: -15px;
+    top: 16px;
+    width: 14px;
+    height: 1px;
+    background: var(--line);
+  }
+  .ticket .agent {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--ticket);
+    padding-top: 2px;
+  }
+  .ticket .belief-text {
+    font-family: 'IBM Plex Serif', serif;
+    font-size: 13px;
+    font-weight: 400;
+    font-style: italic;
+    color: var(--ink-dim);
+    line-height: 1.35;
+  }
+  .ticket .tag {
+    grid-column: 2;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    color: var(--ticket);
+    margin-top: 2px;
+  }
+
+  .punch {
+    margin-top: 28px;
+    font-size: 16px;
+    max-width: 66ch;
+    font-weight: 300;
+  }
+  .punch b { color: var(--corrupt); font-weight: 500 }
+
+  /* Mini compensation callout — residue of the product, not this screen's hero */
+  .residue {
+    margin-top: 20px;
+    border-left: 3px solid var(--corrupt);
+    padding: 12px 16px;
+    background: color-mix(in oklch, var(--corrupt) 8%, var(--ground-2));
+    max-width: 66ch;
+  }
+  .residue .lbl {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--corrupt);
+    margin-bottom: 4px;
+  }
+  .residue p { font-size: 14px; color: var(--ink) }
+  .residue .money {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    font-size: 18px;
+    color: var(--corrupt);
+  }
+
+  footer {
+    margin-top: 48px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-dim);
+    line-height: 1.9;
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="brand">
+    <div class="wordmark-block">
+      <div class="wordmark">RETRACT</div>
+      <div class="claim-mark" aria-hidden="true">
+        <div class="bar">subject · predicate</div>
+        <div class="seat" title="one seat"></div>
+      </div>
+    </div>
+    <div class="meta">
+      lock <b>cust_4471 · id_verified</b><br>
+      agents <b>8 concurrent</b><br>
+      dir <b>2 · one seat at the claim</b>
+    </div>
+  </div>
+
+  <header class="page-head">
+    <h1>Eight writers.<br>One seat.</h1>
+    <p>Identity is a lock, not a distance. Every agent that arrives after the first hangs from the same claim key as a contradiction — it does not invent a new one.</p>
+  </header>
+
+  <p class="section-label">02 — Eight agents, one fact, at the same moment</p>
+  <p class="lede">Eight agents each learn that customer 4471 verified their identity. They phrase it differently and extract the subject differently. There is one fact in the world. The left invents eight keys. The right has one rail.</p>
+
+  <div class="panes">
+    <!-- NAIVE -->
+    <section>
+      <div class="pane-head">
+        <h3>Naive shared memory</h3>
+        <span class="impl">read → think → insert</span>
+      </div>
+      <div class="counts">
+        <div class="count bad">
+          <div class="n">8</div>
+          <div class="l">beliefs held</div>
+        </div>
+        <div class="count bad">
+          <div class="n">8</div>
+          <div class="l">claim keys</div>
+        </div>
+      </div>
+      <div class="orphan-list">
+        <div class="orphan">
+          <span class="agent">agent-0</span>
+          <span class="belief-text">Customer 4471 verified via passport</span>
+          <span class="key-chip">key: Customer 4471</span>
+        </div>
+        <div class="orphan">
+          <span class="agent">agent-1</span>
+          <span class="belief-text">ID verification complete for cust 4471</span>
+          <span class="key-chip">key: cust 4471</span>
+        </div>
+        <div class="orphan">
+          <span class="agent">agent-2</span>
+          <span class="belief-text">4471 passed passport check</span>
+          <span class="key-chip">key: 4471</span>
+        </div>
+        <div class="orphan">
+          <span class="agent">agent-3</span>
+          <span class="belief-text">CUSTOMER#4471 identity confirmed</span>
+          <span class="key-chip">key: CUSTOMER#4471</span>
+        </div>
+        <div class="orphan">
+          <span class="agent">agent-4</span>
+          <span class="belief-text">passport verified — customer 4471</span>
+          <span class="key-chip">key: customer 4471</span>
+        </div>
+        <div class="orphan">
+          <span class="agent">agent-5</span>
+          <span class="belief-text">4471: verification status OK</span>
+          <span class="key-chip">key: 4471:</span>
+        </div>
+        <div class="orphan">
+          <span class="agent">agent-6</span>
+          <span class="belief-text">Cust.4471 has verified identity</span>
+          <span class="key-chip">key: Cust.4471</span>
+        </div>
+        <div class="orphan">
+          <span class="agent">agent-7</span>
+          <span class="belief-text">identity verification done (4471)</span>
+          <span class="key-chip">key: (4471)</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- RETRACT -->
+    <section>
+      <div class="pane-head">
+        <h3>RETRACT</h3>
+        <span class="impl">lock claim key → adjudicate → write</span>
+      </div>
+      <div class="counts">
+        <div class="count good">
+          <div class="n">1</div>
+          <div class="l">belief held</div>
+        </div>
+        <div class="count good">
+          <div class="n">7</div>
+          <div class="l">contradictions</div>
+        </div>
+      </div>
+
+      <div class="rail-stage">
+        <div class="rail">
+          <span>cust_4471 · id_verified</span>
+          <span class="lock-label">CLAIM LOCK · HELD</span>
+        </div>
+
+        <div class="seated">
+          <span class="agent">agent-0</span>
+          <span class="belief-text">Customer 4471 verified via passport</span>
+          <span class="seat-tag">SEATED</span>
+        </div>
+
+        <div class="tickets">
+          <div class="ticket">
+            <span class="agent">agent-1</span>
+            <span class="belief-text">ID verification complete for cust 4471</span>
+            <span class="tag">CONTRADICTION · paraphrase · L2 0.531</span>
+          </div>
+          <div class="ticket">
+            <span class="agent">agent-2</span>
+            <span class="belief-text">4471 passed passport check</span>
+            <span class="tag">CONTRADICTION · paraphrase · L2 0.487</span>
+          </div>
+          <div class="ticket">
+            <span class="agent">agent-3</span>
+            <span class="belief-text">CUSTOMER#4471 identity confirmed</span>
+            <span class="tag">CONTRADICTION · paraphrase · L2 0.512</span>
+          </div>
+          <div class="ticket">
+            <span class="agent">agent-4</span>
+            <span class="belief-text">passport verified — customer 4471</span>
+            <span class="tag">CONTRADICTION · paraphrase · L2 0.298</span>
+          </div>
+          <div class="ticket">
+            <span class="agent">agent-5</span>
+            <span class="belief-text">4471: verification status OK</span>
+            <span class="tag">CONTRADICTION · paraphrase · L2 0.604</span>
+          </div>
+          <div class="ticket">
+            <span class="agent">agent-6</span>
+            <span class="belief-text">Cust.4471 has verified identity</span>
+            <span class="tag">CONTRADICTION · paraphrase · L2 0.441</span>
+          </div>
+          <div class="ticket">
+            <span class="agent">agent-7</span>
+            <span class="belief-text">identity verification done (4471)</span>
+            <span class="tag">CONTRADICTION · paraphrase · L2 0.556</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <p class="punch">Same eight agents. Same instant. Left: <b>8 beliefs / 8 keys</b>, each spelling inventing a universe. Right: <b>1 belief / 7 contradictions</b>, all clipped to one rail.</p>
+
+  <div class="residue">
+    <div class="lbl">When a seated belief is later retracted</div>
+    <p>Pending effects cancel. An effect that already executed cannot: <span class="money">$1,240</span> refund stays flagged <span class="mono">NEEDS_COMPENSATION</span>. The rail walks the derivation graph; it does not pretend money un-sends.</p>
+  </div>
+
+  <footer>
+    Direction 2 · brand device = claim rail (the lock), not embedding-colour proximity<br>
+    Hue 250 ground (cool steel) · hue 155 rail (audit green) · hue 28 only for residue that already executed<br>
+    Type: IBM Plex Sans 300 / 500 / 700 · IBM Plex Serif 400 / 600 for belief text · IBM Plex Mono for keys and distances
+  </footer>
+</div>
+</body>
+</html>
