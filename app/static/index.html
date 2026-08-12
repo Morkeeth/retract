@@ -49,6 +49,11 @@
     font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-dim);
     overflow-wrap:anywhere}
   .facts b{color:var(--ink);font-weight:400}
+  .tokenbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:18px;
+            font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-dim)}
+  .tokenbar input{background:var(--ground-2);border:1px solid var(--line);color:var(--ink);
+                  font:inherit;padding:8px 10px;min-width:min(280px,70vw)}
+  .tokenbar .hint{max-width:52ch}
 
   main{max-width:1180px;margin:0 auto}
   section{margin-bottom:64px}
@@ -142,6 +147,7 @@
   .s.executed{color:var(--ok)} .s.pending{color:var(--ink-dim)}
   .s.cancelled{color:var(--ink-dim)}
   .s.needs_compensation{color:var(--corrupt);font-weight:700;font-size:12px}
+  .s.compensated{color:var(--ok);font-weight:700;font-size:12px}
   .fxrow.flagged{border-left:3px solid var(--corrupt);background:oklch(0.215 0.032 26)}
   .fxrow.flagged .l{color:var(--ink)}
   .fxrow.flagged .money{font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:700;
@@ -163,6 +169,12 @@
     <span>cluster <b id="f-cluster">…</b></span>
     <span>embedder <b id="f-embed">…</b></span>
     <span>adjudicator <b id="f-adj">…</b></span>
+  </div>
+  <div class="tokenbar">
+    <label for="demo-token">demo token</label>
+    <input id="demo-token" type="password" autocomplete="off" spellcheck="false"
+           placeholder="required for Run both / Run the story">
+    <span class="hint" id="token-hint">Write paths are closed without it. Stored only in this browser’s sessionStorage.</span>
   </div>
 </header>
 
@@ -249,6 +261,26 @@
 <script>
 const $=s=>document.querySelector(s);
 
+const tokenInput=$('#demo-token');
+tokenInput.value=sessionStorage.getItem('demo_token')||'';
+tokenInput.addEventListener('change',()=>{
+  sessionStorage.setItem('demo_token', tokenInput.value.trim());
+});
+function demoToken(){
+  const t=tokenInput.value.trim();
+  sessionStorage.setItem('demo_token', t);
+  return t;
+}
+function runUrl(scenario){
+  const t=demoToken();
+  if(!t){
+    $('#token-hint').textContent='Set the demo token above before running a write scenario.';
+    tokenInput.focus();
+    return null;
+  }
+  return '/api/run/'+scenario+'?token='+encodeURIComponent(t);
+}
+
 fetch('/api/health').then(r=>r.json()).then(h=>{
   $('#f-cluster').textContent=h.cluster||'—';
   $('#f-embed').textContent=h.embedder||'—';
@@ -296,11 +328,14 @@ $('#reveal').onclick=()=>{
 };
 
 // ---- the race ------------------------------------------------------------
-function stream(mode,onEvt){
-  const es=new EventSource('/api/race?mode='+mode);
-  ['agent','result','done','booting'].forEach(t=>es.addEventListener(t,e=>{
-    const d=JSON.parse(e.data); onEvt(t,d); if(t==='done') es.close();
+function stream(scenario,onEvt){
+  const url=runUrl(scenario);
+  if(!url) return null;
+  const es=new EventSource(url);
+  ['agent','result','done','booting','error'].forEach(t=>es.addEventListener(t,e=>{
+    const d=JSON.parse(e.data); onEvt(t,d); if(t==='done'||t==='error') es.close();
   }));
+  es.onerror=()=>{ onEvt('error',{error_class:'stream'}); es.close(); };
   return es;
 }
 function line(el,cls,txt){
@@ -308,6 +343,7 @@ function line(el,cls,txt){
   el.appendChild(d); el.scrollTop=el.scrollHeight;
 }
 $('#run').onclick=()=>{
+  if(!demoToken()) return;
   $('#run').disabled=true; $('#runstate').textContent='running…';
   ['#n-log','#r-log'].forEach(s=>$(s).innerHTML='');
   ['#n-big','#r-big','#n-keys','#r-keys','#r-con'].forEach(s=>$(s).textContent='0');
@@ -318,13 +354,13 @@ $('#run').onclick=()=>{
     $('#race-punch').innerHTML=`Same eight agents. Same cluster. Same instant. <b>${n} beliefs</b> on the left, ${r} on the right.`;
   } };
 
-  stream('naive',(t,d)=>{
+  stream('race_naive',(t,d)=>{
     if(t==='agent') line($('#n-log'),'',`agent-${d.agent} read`);
     if(t==='result'){ $('#n-big').textContent=d.beliefs; $('#n-keys').textContent=d.keys;
       line($('#n-log'),'ins',`agent-${d.agent} INSERTED — now ${d.beliefs} beliefs`); }
-    if(t==='done') finish();
+    if(t==='done'||t==='error') finish();
   });
-  stream('retract',(t,d)=>{
+  stream('race_retract',(t,d)=>{
     if(t==='agent') line($('#r-log'),'',`agent-${d.agent} read`);
     if(t==='result'){
       $('#r-big').textContent=d.beliefs; $('#r-keys').textContent=d.keys;
@@ -333,17 +369,18 @@ $('#run').onclick=()=>{
       const dist=d.distance!=null?` (L2 ${d.distance.toFixed(3)})`:'';
       line($('#r-log'),cls,`agent-${d.agent} ${d.outcome.toUpperCase()}${dist}`);
     }
-    if(t==='done') finish();
+    if(t==='done'||t==='error') finish();
   });
 };
 
-// ---- acts 3 + 4 ----------------------------------------------------------
+// ---- acts 3 + 4 (+ compensation closing the loop) ------------------------
 $('#tell').onclick=()=>{
+  const url=runUrl('story'); if(!url) return;
   $('#tell').disabled=true; $('#storystate').textContent='running…';
   ['#chain','#fx','#injectbox','#adj'].forEach(s=>$(s).innerHTML='');
   $('#punch').innerHTML='';
   const byText={};
-  const es=new EventSource('/api/story');
+  const es=new EventSource(url);
   const on=(n,f)=>es.addEventListener(n,e=>f(JSON.parse(e.data)));
 
   on('belief',d=>{
@@ -353,9 +390,12 @@ $('#tell').onclick=()=>{
     $('#chain').appendChild(n); byText[d.text]=n;
   });
   on('effect',d=>{
-    const r=document.createElement('div'); r.className='fxrow';
-    r.innerHTML=`<span class="t">${d.tool}</span><span class="l">${d.label}</span><span class="s ${d.status}">${d.status.toUpperCase()}</span>`;
-    r.dataset.tool=d.tool; $('#fx').appendChild(r);
+    let r=$(`.fxrow[data-tool="${d.tool}"]`);
+    if(!r){
+      r=document.createElement('div'); r.className='fxrow';
+      r.innerHTML=`<span class="t">${d.tool}</span><span class="l">${d.label}</span><span class="s ${d.status}">${d.status.toUpperCase()}</span>`;
+      r.dataset.tool=d.tool; $('#fx').appendChild(r);
+    }
   });
   on('inject',d=>{
     $('#injectbox').innerHTML=`<div class="inject"><div class="lbl">INCOMING CLAIM — SAME SUBJECT, SAME PREDICATE</div>${d.text}</div>`;
@@ -378,16 +418,30 @@ $('#tell').onclick=()=>{
   on('effect_final',d=>{
     const r=$(`.fxrow[data-tool="${d.tool}"]`); if(!r) return;
     r.querySelector('.s').className='s '+d.status;
-    r.querySelector('.s').textContent=d.status.toUpperCase().replace('_',' ');
+    r.querySelector('.s').textContent=d.status.toUpperCase().replace(/_/g,' ');
     if(d.status==='needs_compensation'){
       r.classList.add('flagged');
       r.querySelector('.l').innerHTML=d.label.replace(/(\$[\d,]+)/,'<span class="money">$1</span>');
     }
+    if(d.status==='compensated'){
+      r.classList.remove('flagged');
+      r.classList.add('kept');
+    }
+  });
+  on('compensated',d=>{
+    $('#adj').innerHTML+=`<div class="adjbox"><div class="r">Compensation: ${d.outcome}</div><div class="why">${d.reason||''}${d.reversal_id?' · reversal '+d.reversal_id:''}</div></div>`;
   });
   on('done',d=>{
-    $('#punch').innerHTML=`${d.retracted} beliefs retracted, ${d.cancelled} pending effect cancelled, and <b>${d.compensate} effect that already executed flagged for compensation</b>. The refund is not un-sent. The system says so instead of pretending.`;
-    $('#tell').disabled=false; $('#storystate').textContent='builds a real belief chain, injects a real negation, retracts for real';
+    const nComp=d.compensated||0;
+    $('#punch').innerHTML=nComp
+      ? `${d.retracted} beliefs retracted, ${d.cancelled} pending effect cancelled, and <b>${nComp} executed effect reversed</b> — ledger shows needs_compensation → compensated with the reversal’s own id. The money is not pretended away; the reversal is recorded.`
+      : `${d.retracted} beliefs retracted, ${d.cancelled} pending effect cancelled, and <b>${d.compensate} effect that already executed flagged for compensation</b>. The refund is not un-sent. The system says so instead of pretending.`;
+    $('#tell').disabled=false; $('#storystate').textContent='builds a real belief chain, injects a real negation, retracts and compensates for real';
     es.close();
+  });
+  on('error',d=>{
+    $('#punch').innerHTML=`Write path error: ${d.error_class||'unknown'}. Check the demo token.`;
+    $('#tell').disabled=false; es.close();
   });
 };
 </script>
