@@ -1,0 +1,13 @@
+# Railway needs the cluster id at BUILD time to fetch the CA cert, and build
+# args do not inherit from service variables automatically.
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[build.args]
+CRDB_CLUSTER_ID = "bdfb3fb0-6be5-45d4-acbd-0d0425c055ef"
+
+[deploy]
+healthcheckPath = "/healthz"
+healthcheckTimeout = 120
+restartPolicyType = "on_failure"

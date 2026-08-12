@@ -32,18 +32,34 @@ RUN uv sync --frozen --no-dev --no-install-project
 # demo fails loudly rather than silently degrading to a different vector space,
 # which would make every distance in the table incomparable.
 
+# The cluster's CA. Public, not a secret -- the same file the README tells a
+# reader to fetch. Baked in because libpq's verify-full otherwise looks for
+# ~/.postgresql/root.crt, and sslrootcert=system does NOT work against this
+# cluster (measured: certificate verify failed on all three endpoints).
+ARG CRDB_CLUSTER_ID
+RUN mkdir -p /app/certs \
+ && curl -fsS -o /app/certs/root.crt \
+    "https://cockroachlabs.cloud/clusters/${CRDB_CLUSTER_ID}/cert" \
+ && chmod 644 /app/certs/root.crt
+
 COPY retract/ ./retract/
 COPY app/ ./app/
 COPY schema.sql schema_v2.sql ./
 
 # Non-root. The container holds a live database connection and a Bedrock path;
 # there is no reason for it to be able to write to its own filesystem either.
-RUN useradd --system --uid 10001 retract \
+# --create-home matters: a system user without one makes uv fail at startup
+# trying to build a cache in a directory it cannot create.
+RUN useradd --system --uid 10001 --create-home retract \
  && chown -R retract:retract /app
-USER retract
 
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
   CMD curl -fsS http://localhost:8080/healthz || exit 1
 
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+USER retract
+
+# Call the venv binary directly rather than going through `uv run`. uv wants a
+# writable cache on every invocation, which is pointless for an image whose
+# dependencies are already frozen in /app/.venv.
+CMD ["/app/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
