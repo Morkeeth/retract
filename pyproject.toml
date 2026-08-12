@@ -9,6 +9,11 @@ dependencies = [
     "fastapi>=0.141.1",
     "numpy>=2.5.2",
     "psycopg[binary]>=3.3.4",
-    "sentence-transformers>=5.7.0",
     "uvicorn>=0.52.1",
 ]
+
+# sentence-transformers pulls torch: ~2GB and several minutes of build time.
+# The deployed demo runs on Bedrock, so the container does not need it. Anyone
+# cloning without an AWS account does:  uv sync --extra local
+[project.optional-dependencies]
+local = ["sentence-transformers>=5.7.0"]

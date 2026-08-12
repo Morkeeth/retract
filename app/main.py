@@ -286,6 +286,40 @@ async def health():
             "adjudicator_is_model": _adjudicator.is_model if _adjudicator else None}
 
 
+@app.get("/healthz")
+async def healthz():
+    """Liveness only. Deliberately does NOT touch the database: a health check
+    that fails when the cluster hiccups gets the container killed during the
+    exact incident you wanted it to survive."""
+    return {"ok": True}
+
+
+@app.get("/status")
+async def status():
+    """Non-sensitive readiness. Names which backends are actually live, so a
+    reader can never be misled about whether a model or a stand-in answered."""
+    import subprocess
+    try:
+        sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
+                             capture_output=True, text=True, timeout=2).stdout.strip()
+    except Exception:
+        sha = os.environ.get("BUILD_SHA", "unknown")
+    db = "unknown"
+    try:
+        with psycopg.connect(URL, autocommit=True, connect_timeout=4) as c, c.cursor() as cur:
+            cur.execute("SELECT 1")
+            db = "reachable"
+    except Exception as e:
+        db = f"unreachable: {type(e).__name__}"
+    return {
+        "build": sha or os.environ.get("BUILD_SHA", "unknown"),
+        "database": db,
+        "embedder": _embedder.name if _embedder else "loading",
+        "adjudicator": _adjudicator.name if _adjudicator else "loading",
+        "adjudicator_is_model": _adjudicator.is_model if _adjudicator else None,
+    }
+
+
 @app.get("/")
 async def index():
     return FileResponse(STATIC / "index.html")
