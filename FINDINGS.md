@@ -126,9 +126,13 @@ Correctness rests on an explicit durable lock over the claim key, with
 `FOR UPDATE` locks are documented as best-effort and explicitly "should not be
 relied upon for correctness".
 
-This is why the fallback was made the primary path *before* the experiment ran.
-Had the headline rested on the vector index, this result would have cost the
-project a day. Instead it cost nothing and produced a finding.
+**The sequence matters, and it is easy to misrepresent.** The lock was made the
+primary path *before* this experiment ran — deliberately, so that no result could
+sink the project. So the honest framing is not "this finding led us to the lock".
+It is: *we tested whether the lock could be dropped in favour of the vector index,
+and it cannot.* Presenting a null result as the origin of a design decision it did
+not cause would be null-result theatre, and a reader who checks the commit order
+would catch it.
 
 ## Instrument
 

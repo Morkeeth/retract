@@ -97,7 +97,7 @@ uv run python experiments/adjudicate_eval.py       # paraphrase vs contradiction
 | `race --mode naive` | **8** active beliefs, **8** distinct claim keys, 0 contradictions seen |
 | `race --mode retract` | **1** active belief, **1** claim key, 7 contradictions raised |
 | `cascade` | 8/8 — including *"9902 untouched"* and *"executed refund → needs_compensation"* |
-| `day1_conflict` | NEAR 13% vs FAR 8%, p = 0.15 — **not significant**, published anyway |
+| `day1_conflict` | NEAR 13% vs FAR 8%, p = 0.15 — **not significant**. We tested whether the explicit lock could be dropped in favour of the vector index. It cannot |
 
 ## CockroachDB tools used
 
