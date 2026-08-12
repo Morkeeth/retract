@@ -148,16 +148,19 @@ on the page — a stand-in must never be able to pass as the real thing.
 ## Layout
 
 ```
-retract/engine.py    three-phase commit, contradiction detection, retraction cascade
-retract/claim.py     canonicalisation — the guarantee lives here, so it is boring by design
-retract/embed.py     Titan / local / hash, each declaring its own dimension
+retract/engine.py     three-phase commit, contradiction detection, retraction cascade
+retract/claim.py      canonicalisation — the guarantee lives here, so it is boring by design
+retract/embed.py      Titan / local / hash, each declaring its own dimension
 retract/adjudicate.py Claude / heuristic stand-in
-schema.sql           memory (bitemporal), derivation DAG, effect ledger, audit log
-schema_v2.sql        the claim key and contradiction tables
-app/                 the demo surface — every number is a live transaction
-experiments/         evals, each with a control arm
-FINDINGS.md          two negative results that changed the design
-DEMO.md              shot-by-shot script for the video
+retract/mcp.py        the governed read path — reads only, structurally
+schema.sql            memory (bitemporal), derivation DAG, effect ledger, audit log
+schema_v2.sql         the claim key and contradiction tables
+app/                  the demo surface — every number is a live transaction
+Dockerfile            Bedrock-only image; no torch, no silent fallback
+experiments/          evals, each with a control arm
+FINDINGS.md           two negative results that changed the design
+RELATED-WORK.md       convergent work, and what is actually ours
+DEMO.md               shot-by-shot script for the video
 ```
 
 ## Licence

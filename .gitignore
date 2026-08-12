@@ -9,3 +9,7 @@ wheels/
 # Virtual environments
 .venv
 .env
+
+# local scratch
+.pytest_cache/
+designs/
