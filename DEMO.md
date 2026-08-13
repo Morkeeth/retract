@@ -14,15 +14,30 @@ take — never edit a number.
 
 ## SETUP (before recording)
 
+**Rehearse on localhost. Shoot the take on the public URL.** This script used to
+say to record against `localhost:8117`, and PLAN.md says in the same breath that
+a judge who sees `localhost:8117` has watched a private demo. Both cannot be
+right. The deployed URL wins: it is the only address that proves the thing runs
+anywhere but this laptop, and it is free to look at now that `/api/distances` is
+cached.
+
+Rehearsal, as many times as you like:
+
     cd ~/CODE/retract
     set -a && . ./.env && set +a
     RETRACT_EMBEDDER=local uv run uvicorn app.main:app --port 8117
 
-Open `http://localhost:8117` and **wait ~8s** for the header to stop saying
-`loading` — the first page load warms the embedding model. Then hard-refresh once
-so the recording starts warm. Record at 1440 wide; the ruler needs the room.
+The take, and every take that reaches the cut:
 
-Check the header strip reads a real cluster version before you roll.
+    open https://retract-production.up.railway.app
+
+**Wait ~8s** for the header to stop saying `loading` — the first page load warms
+the embedding model. Then hard-refresh once so the recording starts warm. Record
+at 1440 wide; the ruler needs the room.
+
+Check the header strip reads a real cluster version before you roll. And check
+the address bar is in frame — on this film the URL is evidence, so crop to
+include it rather than cropping it out.
 
 ---
 
@@ -42,7 +57,7 @@ Hold three seconds on those two tooltips.
 
 *Why it opens:* it is a fact about the world, not a claim about the product.
 
-## 0:18 – 0:40 · THE CHALLENGE, THEN THE REVEAL
+## 0:18 – 0:36 · THE CHALLENGE, THEN THE REVEAL
 
 On screen already: *"7 pairs. 2 of them are the same fact said twice. Point at the 2."*
 
@@ -52,7 +67,7 @@ Click **Reveal what each pair really is**. Marks separate into two clear colours
 
 > Nothing about the distances changed. Only something that read them.
 
-## 0:40 – 1:15 · EIGHT AGENTS, ONE FACT
+## 0:36 – 1:08 · EIGHT AGENTS, ONE FACT
 
 Click **Run both, live**. Do not cut. Do not speed up.
 
@@ -67,7 +82,7 @@ Point at the left pane's second stat: **8 claim keys**. The agents also spelled
 the customer eight different ways — `Customer 4471`, `cust 4471`, `4471`. The
 memory fragmented before concurrency was even involved.
 
-## 1:15 – 1:55 · THE CONTRADICTION THAT IS REAL
+## 1:08 – 1:45 · THE CONTRADICTION THAT IS REAL
 
 Click **Run the story, live**. Five beliefs build, three effects attach — one of
 them a refund that **executes**.
@@ -85,7 +100,7 @@ adjudicates a claim at a time and that the outcome is atomic. It does not
 guarantee the verdict is right. That sentence buys more credibility than any
 claim in the film.
 
-## 1:55 – 2:30 · THE MONEY ALREADY MOVED
+## 1:45 – 2:20 · THE MONEY ALREADY MOVED
 
 The cascade runs on screen. Four beliefs strike through as RETRACTED. Customer
 9902 stays UNTOUCHED — say that out loud, it is the blast-radius proof.
@@ -102,9 +117,47 @@ is gone and the system says so.
 > An agent memory that cannot reach its own side effects is a diary, not a
 > system of record.
 
-## 2:30 – 2:45 · RECEIPTS
+## 2:20 – 2:45 · THE MONEY COMES BACK
 
-Three cuts, four seconds each:
+**This is the ending, and the film does not have it yet.** Every other act shows
+a system noticing something. This is the only one where it acts. Cut the
+receipts before you cut this.
+
+Two separate things have to exist first, and they are not the same thing:
+
+- **The handler** — PR #2, written, and never run against the live cluster.
+- **The button** — does NOT exist. PR #2 deliberately left the UI alone; PLAN.md
+  Day 3 owns "act 5 on the demo surface". Nothing on the page triggers a
+  compensation today, so this act cannot be shot at all until that lands.
+
+The shot below is written against the surface as it will be, so the wiring has a
+target to hit. Treat every number in it as a placeholder until the eval prints
+real ones — this script's own rule is never to edit a number, and that applies
+to the person writing the script too.
+
+Click **Compensate**. One row is written, and the table settles:
+
+    refund_issued     $1,240 sent to customer 4471      COMPENSATED
+    refund_reversed   $1,240 returned to customer 4471  EXECUTED
+    card_charge       $89 processed                     NEEDS COMPENSATION
+
+Hold on the third line for two full seconds. It is the most important row on
+screen and it is the one that did **not** work.
+
+> The reversal is a new effect with its own id, not a deletion. And the tool
+> with no registered compensation stays flagged — the system will not pretend
+> it fixed something it cannot reach.
+
+*Why the failure stays in the film:* every agent-memory product can show you a
+happy path. Leaving `card_charge` red is the difference between a demo and a
+measurement, and it is the same reason `FINDINGS.md` publishes a null result.
+
+**Do not shoot this act until `experiments/verify_live.sh` is green against the
+live cluster.** A reversal that has only ever run locally is a claim.
+
+## 2:45 – 2:55 · RECEIPTS
+
+Compressed to make room for act 5. Three cuts, three seconds each:
 
 1. `FINDINGS.md` — the negative result. We tested whether the vector index alone
    serialises concurrent adjacent writes. It does not: 13% vs an 8% control,
@@ -117,7 +170,7 @@ Three cuts, four seconds each:
 
 ## THE BEDROCK SWAP — exactly where it changes the film
 
-One line changes, in one shot, at **1:45**: the adjudicator verdict box.
+One line changes, in one shot, at **1:38**: the adjudicator verdict box.
 
 Today it reads `by heuristic (stand-in, not a model)`. The page prints that
 honestly and the eval scores it 7/8, failing the one case that needs real
@@ -131,7 +184,7 @@ When Bedrock model access lands:
       RETRACT_EMBEDDER=bedrock uv run uvicorn app.main:app --port 8117
 
 Confirm the header strip now names a Claude model, re-run
-`experiments/adjudicate_eval.py` and expect 8/8, then reshoot **from 1:15**.
+`experiments/adjudicate_eval.py` and expect 8/8, then reshoot **from 1:08**.
 Acts 1, 2 and 4 are unaffected and their takes remain valid.
 
 Nothing else in this script changes.
@@ -140,8 +193,30 @@ Nothing else in this script changes.
 
 ## PRE-FLIGHT
 
+- [ ] **Address bar reads the Railway URL, not `localhost`** — and is in frame
 - [ ] Header shows a real cluster version, not `loading`
 - [ ] One warm-up run so the embedder is hot
 - [ ] Adjudicator line checked — stand-in for rehearsal, Claude for the final
 - [ ] 1440 wide
 - [ ] Both buttons re-enabled (they disable while running)
+- [ ] **Act 5 wired and `verify_live.sh` green** — or the film ends on a flag
+- [ ] **Total runtime under 3:00** — Devpost rejects over. This cut lands 2:55,
+      so there is five seconds of margin and no room for an intro card
+
+---
+
+## WHAT THIS SCRIPT STILL CANNOT TELL YOU
+
+Stated here rather than discovered on the day:
+
+- **Every timing above 2:20 is estimated, not measured.** The rest of the file
+  earns its opening sentence — those were rehearsed on 12 Aug. Act 5 has never
+  been run by anyone, so its 25 seconds is a guess. Re-time it after the first
+  rehearsal and correct this line.
+- **Whether the public URL behaves like localhost under recording.** The demo
+  has only ever been driven locally. Network latency on the two race panes is
+  the number most likely to move, and the race is the act that depends on a
+  visible 0.90s / 1.85s gap.
+- **Whether PR #2's demo token gates the buttons on the public URL.** If it
+  does, the take needs the token in the session and the address bar must not
+  show it.
