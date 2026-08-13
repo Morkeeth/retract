@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from retract.embed import get_embedder  # noqa: E402
 from retract.engine import MemoryEngine  # noqa: E402
 from retract.mcp import GovernedMemoryReader, MCPClient, MCPError  # noqa: E402
+from retract.scope import ScopeGrant  # noqa: E402
 
 # Every one of these MUST be refused by select_query.
 ATTACKS = [
@@ -61,7 +62,10 @@ def main() -> int:
                "Customer 7781 FAILED identity verification.",
                "cust 7781", "identity_verification")
 
-    reader = GovernedMemoryReader(mcp, scope)
+    # This experiment creates the scope a few lines up, so it is entitled to
+    # mint the grant. Anything that did not create the scope must be handed a
+    # token instead -- see experiments/scope_eval.py.
+    reader = GovernedMemoryReader(mcp, ScopeGrant.for_owned_scope(scope))
     beliefs = reader.beliefs()
     contras = reader.open_contradictions()
     audit = reader.audit_tail()

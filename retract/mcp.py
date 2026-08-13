@@ -21,6 +21,13 @@ property, and it falls out of the tool's design rather than our discipline.
 
 The endpoint enforces this too: `select_query` rejects anything that is not a
 single read-only SELECT.
+
+WHAT THAT ASYMMETRY DOES NOT COVER
+
+Being unable to write says nothing about *which tenant's* rows you may read.
+That second boundary was open until 13 Aug: the reader took a scope name from
+its caller. It now takes a granted scope; see `retract/scope.py` for what the
+grant proves and what it still does not.
 """
 
 from __future__ import annotations
@@ -30,6 +37,8 @@ import os
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+
+from .scope import ScopeDenied, ScopeGrant
 
 ENDPOINT = "https://cockroachlabs.cloud/mcp"
 
@@ -140,15 +149,26 @@ class GovernedMemoryReader:
     guarantee would be a convention; because MCP cannot, it is structural.
     """
 
-    def __init__(self, client: MCPClient, scope: str):
+    def __init__(self, client: MCPClient, grant: ScopeGrant):
+        # A string used to be accepted here, and that was the whole defect: the
+        # caller named the tenant boundary it wanted to be inside. Refusing the
+        # string outright, rather than coercing it, is deliberate -- a coercion
+        # would have let every existing call site keep the old authority.
+        if not isinstance(grant, ScopeGrant):
+            raise ScopeDenied(
+                "GovernedMemoryReader needs a ScopeGrant, not a scope name. "
+                "Mint one where the scope is owned: ScopeGrant.for_owned_scope(...)"
+            )
         self.mcp = client
-        self.scope = scope.replace("'", "''")
+        self.grant = grant
+        self.scope = grant.scope
+        self._s = grant.sql_literal()
 
     def beliefs(self, limit: int = 20) -> list[dict]:
         return self.mcp.select(f"""
             SELECT subject, predicate, content, author_agent, recorded_at
             FROM memory
-            WHERE scope = '{self.scope}' AND valid_to IS NULL AND status = 'active'
+            WHERE scope = {self._s} AND valid_to IS NULL AND status = 'active'
             ORDER BY recorded_at DESC LIMIT {int(limit)}
         """)
 
@@ -157,7 +177,7 @@ class GovernedMemoryReader:
         return self.mcp.select(f"""
             SELECT subject, predicate, challenger, challenger_by, distance, detected_at
             FROM contradiction
-            WHERE scope = '{self.scope}' AND resolution = 'open'
+            WHERE scope = {self._s} AND resolution = 'open'
             ORDER BY detected_at DESC
         """)
 
@@ -166,21 +186,32 @@ class GovernedMemoryReader:
         return self.mcp.select(f"""
             SELECT e.tool, e.idempotency_key, e.status, m.content AS justified_by
             FROM effect e JOIN memory m ON m.id = e.justified_by
-            WHERE e.scope = '{self.scope}' AND e.status = 'needs_compensation'
+            WHERE e.scope = {self._s} AND e.status = 'needs_compensation'
         """)
 
     def provenance(self, memory_id: str) -> list[dict]:
-        """What a belief was built on. Reads the DAG without touching it."""
+        """What a belief was built on. Reads the DAG without touching it.
+
+        `derivation` carries no scope of its own -- it is two memory ids -- so
+        this query was reachable for ANY memory id regardless of tenant, which
+        made it a cross-tenant read even for a correctly scoped reader. Both
+        ends of the edge are now constrained: a caller cannot walk out of its
+        own scope by naming a child, and cannot learn a parent by inference
+        from one that is in scope.
+        """
         mid = memory_id.replace("'", "''")
         return self.mcp.select(f"""
             SELECT m.id, m.content, m.status
-            FROM derivation d JOIN memory m ON m.id = d.parent_id
+            FROM derivation d
+            JOIN memory m ON m.id = d.parent_id
+            JOIN memory c ON c.id = d.child_id
             WHERE d.child_id = '{mid}'
+              AND c.scope = {self._s} AND m.scope = {self._s}
         """)
 
     def audit_tail(self, limit: int = 25) -> list[dict]:
         return self.mcp.select(f"""
             SELECT at, agent, action, detail
-            FROM audit_log WHERE scope = '{self.scope}'
+            FROM audit_log WHERE scope = {self._s}
             ORDER BY at DESC LIMIT {int(limit)}
         """)
