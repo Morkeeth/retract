@@ -190,8 +190,8 @@ class MemoryEngine:
             # 3. Nothing believed yet. Write it.
             new_id = uuid.uuid4()
             cur.execute(
-                "INSERT INTO memory (id, scope, content, embedding, bucket, subject, predicate, "
-                "embedder, author_agent, snapshot_ts) VALUES (%s,%s,%s,%s::vector,0,%s,%s,%s,%s,%s)",
+                "INSERT INTO memory (id, scope, content, embedding, subject, predicate, "
+                "embedder, author_agent, snapshot_ts) VALUES (%s,%s,%s,%s::vector,%s,%s,%s,%s,%s)",
                 (new_id, self.scope, content, vec_literal(embedding), subj, pred,
                  self.embedder_name, self.agent, "0"),
             )
@@ -243,9 +243,9 @@ class MemoryEngine:
                     raise ValueError("superseding requires the challenger's embedding")
                 new_id = uuid.uuid4()
                 cur.execute(
-                    "INSERT INTO memory (id, scope, content, embedding, bucket, subject, "
+                    "INSERT INTO memory (id, scope, content, embedding, subject, "
                     "predicate, embedder, author_agent, snapshot_ts) "
-                    "VALUES (%s,%s,%s,%s::vector,0,%s,%s,%s,%s,%s)",
+                    "VALUES (%s,%s,%s,%s::vector,%s,%s,%s,%s,%s)",
                     (new_id, self.scope, c["challenger"], vec_literal(embedding),
                      c["subject"], c["predicate"], self.embedder_name, self.agent, "0"),
                 )
@@ -315,6 +315,17 @@ class MemoryEngine:
             conn.commit()
 
         return {"retracted": ids, "cancelled": cancelled, "needs_compensation": compensate}
+
+    # ---------------------------------------------------------- COMPENSATE ---
+    def compensate(self, effect_id: uuid.UUID):
+        """Reverse one effect that `retract` flagged as needs_compensation.
+
+        Lives in `retract.compensate` so the registry stays a boring table rather
+        than growing methods on the engine. Exposed here because every other
+        mutation of shared memory goes through MemoryEngine.
+        """
+        from .compensate import compensate_effect
+        return compensate_effect(self.url, self.scope, self.agent, effect_id)
 
     # ---------------------------------------------------------------------- #
     def _audit(self, cur, action: str, memory_id, detail: dict) -> None:

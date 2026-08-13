@@ -4,6 +4,10 @@ Nothing here is simulated. Every event streamed to the browser is the result of
 an actual transaction against CockroachDB. The naive pane is a real, deliberately
 naive implementation -- not a strawman drawn in CSS -- because a control the
 viewer cannot verify is theatre.
+
+Write paths are preset scenarios under `/api/run/{id}` and go through the
+guards in `app/middleware.py`. No request text ever reaches an embedding or a
+model call — the claims below are the only inputs the runners use.
 """
 
 from __future__ import annotations
@@ -11,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import os
 import queue
 import sys
@@ -21,19 +26,37 @@ from pathlib import Path
 
 import numpy as np
 import psycopg
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from middleware import (  # noqa: E402
+    REQUEST_TIMEOUT_S,
+    DemoGuardMiddleware,
+    configure_logging,
+)
 from retract.adjudicate import get_adjudicator  # noqa: E402
 from retract.embed import get_embedder  # noqa: E402
 from retract.engine import MemoryEngine, vec_literal  # noqa: E402
 from retract.mcp import GovernedMemoryReader, MCPClient, MCPError  # noqa: E402
 from retract.scope import ScopeDenied, ScopeGrant, mint  # noqa: E402
 
+configure_logging()
+log = logging.getLogger("retract")
+
 app = FastAPI(title="RETRACT")
+app.add_middleware(DemoGuardMiddleware)
 STATIC = Path(__file__).parent / "static"
 URL = os.environ["CRDB_URL"]
+
+# Server-side scenario IDs. The URL carries an id from this set and nothing
+# else — no free-form mode, no caller-supplied claim text.
+SCENARIOS = {
+    "race_naive": "race",
+    "race_retract": "race",
+    "story": "story",
+}
 
 CLAIMS = [
     ("Customer 4471 has verified their identity via passport.", "Customer 4471", "identity verified"),
@@ -140,9 +163,9 @@ def run_race(mode: str, q: "queue.Queue[dict]") -> None:
         if mode == "naive":
             with psycopg.connect(URL, autocommit=True) as c, c.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO memory (scope, content, embedding, bucket, subject, predicate,"
+                    "INSERT INTO memory (scope, content, embedding, subject, predicate,"
                     " embedder, author_agent, snapshot_ts)"
-                    " VALUES (%s,%s,%s::vector,0,%s,%s,'naive',%s,'0')",
+                    " VALUES (%s,%s,%s::vector,%s,%s,'naive',%s,'0')",
                     (scope, content, vec_literal(emb), subject, predicate, f"agent-{i}"),
                 )
             with lock:
@@ -182,26 +205,49 @@ def run_race(mode: str, q: "queue.Queue[dict]") -> None:
          keys=len(state["keys"]), scope=scope)
 
 
+@app.get("/api/run/{scenario_id}")
+async def run_scenario(scenario_id: str, request: Request):
+    """Preset write-path scenarios. The only way to mutate the demo database.
+
+    `scenario_id` is one of `race_naive`, `race_retract`, `story`. Anything else
+    is 404. No request body is read; no query text reaches the embedder or the
+    adjudicator — those inputs are the module-level CLAIMS / NEGATION constants.
+    """
+    if scenario_id not in SCENARIOS:
+        raise HTTPException(
+            404,
+            f"unknown scenario {scenario_id!r}; choose from {sorted(SCENARIOS)}",
+        )
+    request_id = getattr(request.state, "request_id", None)
+    log.info(
+        "scenario_start",
+        extra={
+            "request_id": request_id, "scenario": scenario_id,
+            "path": request.url.path, "adjudication_mode":
+            (_adjudicator.name if _adjudicator else "loading"),
+        },
+    )
+    kind = SCENARIOS[scenario_id]
+    if kind == "race":
+        mode = "naive" if scenario_id == "race_naive" else "retract"
+        return StreamingResponse(
+            _race_stream(mode, request_id),
+            media_type="text/event-stream",
+        )
+    return StreamingResponse(
+        _story_stream(request_id),
+        media_type="text/event-stream",
+    )
+
+
 @app.get("/api/race")
-async def race(mode: str = "retract"):
-    q: "queue.Queue[dict]" = queue.Queue()
-
-    async def gen():
-        while _embedder is None:
-            yield sse("booting", {"msg": "loading embedder"})
-            await asyncio.sleep(0.4)
-        threading.Thread(target=run_race, args=(mode, q), daemon=True).start()
-        while True:
-            try:
-                item = q.get_nowait()
-            except queue.Empty:
-                await asyncio.sleep(0.05)
-                continue
-            yield sse(item["type"], item)
-            if item["type"] == "done":
-                break
-
-    return StreamingResponse(gen(), media_type="text/event-stream")
+@app.get("/api/story")
+async def legacy_write_paths_removed():
+    """Old free-form write paths. Removed so a bookmarked URL cannot skip the token."""
+    raise HTTPException(
+        410,
+        "use /api/run/{race_naive|race_retract|story}?token=… — free-form write paths are gone",
+    )
 
 
 @app.get("/api/distances")
@@ -214,6 +260,12 @@ async def distances():
     -- an unauthenticated stranger could spend our AWS budget by holding down
     refresh. The pairs are a fixed constant and the embedder is deterministic,
     so recomputing was buying an identical answer every time.
+
+    Read path, so no token, and that is safe here for a second reason: the
+    pairs are server-side constants, so no request text ever reaches an
+    embedder. SECURITY.md still says this endpoint costs an embedder call per
+    page load -- that was true when it was written and the cache is what made
+    it false. Fix that sentence there rather than here.
 
     The result carries `computed_at` so the page cannot present a cached number
     as a live one.
@@ -242,7 +294,7 @@ async def distances():
 
 
 @app.get("/api/contradictions")
-async def contradictions(token: str = ""):
+async def contradictions(grant_token: str = ""):
     """The facts this fleet currently disagrees about, read through MCP.
 
     THIS IS THE ONLY ENDPOINT THAT DOES NOT TALK SQL, AND THAT IS THE POINT.
@@ -254,7 +306,13 @@ async def contradictions(token: str = ""):
     meant a judge who opened the live URL and ran no eval saw exactly one
     CockroachDB tool in a submission whose gate needs two.
 
-    `token` is a scope grant, minted by /api/story for the session it created.
+    The parameter is `grant_token`, NOT `token`. PR #2's middleware reads
+    `?token=` as the demo write-path credential, and two different secrets
+    sharing one parameter name in one app is a collision waiting for the day
+    this route moves behind a guard. Named apart on purpose.
+
+    `grant_token` is a scope grant, minted by /api/story for the session it
+    created.
     A caller cannot read another session's contradictions by naming its scope,
     because naming is no longer how you get in.
 
@@ -264,7 +322,7 @@ async def contradictions(token: str = ""):
     demonstrating a tool it was not using.
     """
     try:
-        grant = ScopeGrant.from_token(token)
+        grant = ScopeGrant.from_token(grant_token)
     except ScopeDenied as e:
         return {"available": False, "reason": f"scope: {e}", "open": None}
 
@@ -289,17 +347,44 @@ def _mcp_client():
     return _mcp
 
 
-@app.get("/api/story")
-async def story():
-    """Acts 3 and 4: the real contradiction, then the retraction cascade.
-
-    Builds a fresh belief chain, injects a negation on the SAME claim key,
-    adjudicates it, then retracts the root and reports the blast radius.
-    Every step is a real transaction; the effects table really is updated.
-    """
-    while _embedder is None or _adjudicator is None:
-        await asyncio.sleep(0.3)
-    return StreamingResponse(_story_stream(), media_type="text/event-stream")
+async def _race_stream(mode: str, request_id: str | None):
+    q: "queue.Queue[dict]" = queue.Queue()
+    started = time.monotonic()
+    while _embedder is None:
+        if time.monotonic() - started > REQUEST_TIMEOUT_S:
+            yield sse("error", {"error_class": "timeout", "msg": "embedder boot timed out"})
+            return
+        yield sse("booting", {"msg": "loading embedder"})
+        await asyncio.sleep(0.4)
+    threading.Thread(target=run_race, args=(mode, q), daemon=True).start()
+    while True:
+        if time.monotonic() - started > REQUEST_TIMEOUT_S:
+            log.info(
+                "scenario_timeout",
+                extra={"request_id": request_id, "scenario": f"race_{mode}",
+                       "error_class": "timeout"},
+            )
+            yield sse("error", {"error_class": "timeout"})
+            return
+        try:
+            item = q.get_nowait()
+        except queue.Empty:
+            await asyncio.sleep(0.05)
+            continue
+        if item["type"] == "done":
+            log.info(
+                "scenario_done",
+                extra={
+                    "request_id": request_id, "scenario": f"race_{mode}",
+                    "lock_outcome": (
+                        f"beliefs={item.get('beliefs')} contradictions="
+                        f"{item.get('contradictions')} keys={item.get('keys')}"
+                    ),
+                },
+            )
+        yield sse(item["type"], item)
+        if item["type"] == "done":
+            break
 
 
 def _story_events(q: "queue.Queue[dict]") -> None:
@@ -370,29 +455,88 @@ def _story_events(q: "queue.Queue[dict]") -> None:
         time.sleep(0.22)
 
     with psycopg.connect(URL, autocommit=True) as c, c.cursor() as cur:
-        cur.execute("SELECT tool, status, payload FROM effect WHERE scope=%s ORDER BY tool", (scope,))
-        for tool, status, payload in cur.fetchall():
-            put(type="effect_final", tool=tool, status=status,
-                label=payload.get("label", ""))
-            time.sleep(0.22)
+        cur.execute(
+            "SELECT id, tool, status, payload FROM effect WHERE scope=%s ORDER BY tool",
+            (scope,),
+        )
+        effect_rows = cur.fetchall()
 
-    # The token, not just the name. The feed is scope-enforced, so the browser
-    # needs a grant to read back the contradictions this session just created --
-    # and it can only ever read this one.
+    for eid, tool, status, payload in effect_rows:
+        put(type="effect_final", tool=tool, status=status,
+            label=payload.get("label", ""), effect_id=str(eid))
+        time.sleep(0.22)
+
+    # Close the loop the flag opens. One compensation per needs_compensation
+    # row that has a registered handler; unknown tools stay flagged (surfaced
+    # below as still needs_compensation). Day 3 owns a dedicated act-5 UI;
+    # calling the handler here is what makes the Day-2 public-URL check true.
+    compensated = 0
+    for eid, tool, status, payload in effect_rows:
+        if status != "needs_compensation":
+            continue
+        result = eng.compensate(eid)
+        put(type="compensated", tool=tool,
+            outcome=result.outcome,
+            compensating_tool=result.compensating_tool,
+            reversal_id=str(result.reversal_id) if result.reversal_id else None,
+            reason=result.reason)
+        if result.outcome in ("compensated", "already_compensated"):
+            compensated += 1
+            put(type="effect_final", tool=tool, status="compensated",
+                label=payload.get("label", ""),
+                reversal_id=str(result.reversal_id) if result.reversal_id else None)
+            if result.compensating_tool and result.reversal_id:
+                put(type="effect", tool=result.compensating_tool, status="executed",
+                    label=f"reversal of {tool}", effect_id=str(result.reversal_id))
+        time.sleep(0.22)
+
+    # Both sides of this merge added a field and neither is optional. PR #2's
+    # `compensated` is the count the film's ending reads; `scope_token` is what
+    # lets the browser read its own contradictions back through MCP. Dropping
+    # either one silently removes a feature that has a test.
     put(type="done", scope=scope, scope_token=mint(scope),
         retracted=len(out["retracted"]),
-        cancelled=len(out["cancelled"]), compensate=len(out["needs_compensation"]))
+        cancelled=len(out["cancelled"]),
+        compensate=len(out["needs_compensation"]),
+        compensated=compensated)
 
 
-async def _story_stream():
+async def _story_stream(request_id: str | None = None):
+    while _embedder is None or _adjudicator is None:
+        await asyncio.sleep(0.3)
     q: "queue.Queue[dict]" = queue.Queue()
+    started = time.monotonic()
     threading.Thread(target=_story_events, args=(q,), daemon=True).start()
     while True:
+        if time.monotonic() - started > REQUEST_TIMEOUT_S:
+            log.info(
+                "scenario_timeout",
+                extra={"request_id": request_id, "scenario": "story",
+                       "error_class": "timeout"},
+            )
+            yield sse("error", {"error_class": "timeout"})
+            return
         try:
             item = q.get_nowait()
         except queue.Empty:
             await asyncio.sleep(0.05)
             continue
+        if item["type"] == "done":
+            log.info(
+                "scenario_done",
+                extra={
+                    "request_id": request_id, "scenario": "story",
+                    "cascade_count": item.get("retracted"),
+                    "adjudication_mode": (
+                        _adjudicator.name if _adjudicator else "loading"
+                    ),
+                    "lock_outcome": (
+                        f"cancelled={item.get('cancelled')} "
+                        f"flagged={item.get('compensate')} "
+                        f"compensated={item.get('compensated')}"
+                    ),
+                },
+            )
         yield sse(item["type"], item)
         if item["type"] == "done":
             break

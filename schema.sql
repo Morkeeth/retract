@@ -51,6 +51,12 @@ CREATE TABLE IF NOT EXISTS derivation (
 -- Retracting a belief cancels its pending effects in the SAME transaction,
 -- and surfaces the already-executed ones for compensation. An agent memory
 -- that cannot reach its own side effects is a diary, not a system of record.
+--
+-- Closing the loop: a compensation writes a NEW effect row (its own
+-- idempotency key, derived as `comp:<original>` so the UNIQUE constraint
+-- below is the exactly-once guarantee) and moves the original
+-- needs_compensation -> compensated, recording the reversal id on
+-- compensated_by. Both happen in one transaction. See retract/compensate.py.
 ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS effect (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -60,9 +66,11 @@ CREATE TABLE IF NOT EXISTS effect (
     payload          JSONB NOT NULL,
     idempotency_key  STRING NOT NULL,
     status           STRING NOT NULL DEFAULT 'pending'
-                     CHECK (status IN ('pending', 'executed', 'cancelled', 'needs_compensation')),
+                     CHECK (status IN ('pending', 'executed', 'cancelled',
+                                       'needs_compensation', 'compensated')),
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     executed_at      TIMESTAMPTZ,
+    compensated_by   UUID REFERENCES effect(id), -- the reversal row, when status=compensated
     UNIQUE (scope, idempotency_key),            -- the exactly-once guarantee
     INDEX effect_by_memory (justified_by)
 );

@@ -88,7 +88,7 @@ class ExplodingPsycopg:
 
 
 def call(token: str) -> dict:
-    return asyncio.run(app_main.contradictions(token=token))
+    return asyncio.run(app_main.contradictions(grant_token=token))
 
 
 def fallback_contradictions(token: str, mcp_available: bool) -> dict:
