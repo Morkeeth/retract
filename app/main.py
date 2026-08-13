@@ -433,12 +433,22 @@ async def status():
             db = "reachable"
     except Exception as e:
         db = f"unreachable: {type(e).__name__}"
+    # The MCP line exists because of a deployment trap that is invisible from
+    # the outside: railway.toml sets CRDB_CLUSTER_ID as a BUILD arg, which is
+    # not a runtime variable. If the service variables are missing, section 05
+    # renders an honest "not available" and the second CockroachDB tool
+    # silently stops being visible in the product -- a page that looks fine
+    # while the submission quietly loses half its gate. Reported by NAME only;
+    # no value of any credential is ever returned here.
+    absent = [v for v in ("CRDB_API_KEY", "CRDB_CLUSTER_ID") if not os.environ.get(v)]
     return {
         "build": sha or os.environ.get("BUILD_SHA", "unknown"),
         "database": db,
         "embedder": _embedder.name if _embedder else "loading",
         "adjudicator": _adjudicator.name if _adjudicator else "loading",
         "adjudicator_is_model": _adjudicator.is_model if _adjudicator else None,
+        "mcp": "configured" if not absent else f"NOT configured, missing: {', '.join(absent)}",
+        "contradiction_feed": "live" if not absent else "will render 'not available'",
     }
 
 
