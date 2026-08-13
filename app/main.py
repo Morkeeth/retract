@@ -9,6 +9,7 @@ viewer cannot verify is theatre.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
 import queue
@@ -45,9 +46,60 @@ CLAIMS = [
 NEGATION = ("Customer 4471 FAILED identity verification - passport is forged.",
             "Customer 4471", "identity verified")
 
+# The pairs behind /api/distances. A module-level constant because the cache
+# key is derived from them: edit a pair and every cached answer is discarded,
+# which is the only way a stale number cannot outlive the question it answered.
+DISTANCE_PAIRS = [
+    ("verified via passport", "ID verification complete", "paraphrase"),
+    ("verified via passport", "identity confirmed, passport on file", "paraphrase"),
+    ("Customer 4471 verified", "Customer 4472 verified", "different customer"),
+    ("verified their identity", "FAILED identity verification", "negation"),
+    ("refund of $1,240 approved", "refund of $1,240 declined", "negation"),
+    ("refund of $1,240 approved", "refund of $2,140 approved", "different amount"),
+    ("9902 lives in Berlin", "9902 used to live in Berlin", "tense change"),
+]
+
+# Survives process restarts, so a redeploy does not re-pay for an answer that
+# cannot have changed. /tmp is the honest default on Railway: the container
+# filesystem is ephemeral, so the guarantee is "once per container", not
+# "once ever". Set RETRACT_CACHE_DIR at a volume to get the stronger one.
+CACHE_DIR = Path(os.environ.get("RETRACT_CACHE_DIR", "/tmp/retract-cache"))
+
 _embedder = None
 _adjudicator = None
 _vectors: list[np.ndarray] = []
+_distances_lock = asyncio.Lock()
+_distances_memo: dict[str, dict] = {}
+
+
+def _distances_key(embedder_name: str) -> str:
+    h = hashlib.sha256(json.dumps(DISTANCE_PAIRS).encode()).hexdigest()[:16]
+    return f"distances-{embedder_name}-{h}"
+
+
+def _load_distances(embedder_name: str) -> dict | None:
+    key = _distances_key(embedder_name)
+    if key in _distances_memo:
+        return _distances_memo[key]
+    try:
+        payload = json.loads((CACHE_DIR / f"{key}.json").read_text())
+    except (OSError, ValueError):
+        # A missing or corrupt cache costs one recomputation, never an error
+        # page. The failure mode of a cache must be slowness, not an outage.
+        return None
+    _distances_memo[key] = payload
+    return payload
+
+
+def _store_distances(embedder_name: str, payload: dict) -> None:
+    _distances_memo[_distances_key(embedder_name)] = payload
+    try:
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        (CACHE_DIR / f"{_distances_key(embedder_name)}.json").write_text(json.dumps(payload))
+    except OSError:
+        # An unwritable disk degrades us to once-per-process, which is still
+        # bounded. Not worth failing the request over.
+        pass
 
 
 def boot() -> None:
@@ -151,24 +203,39 @@ async def race(mode: str = "retract"):
 
 @app.get("/api/distances")
 async def distances():
-    """The measurement that kills threshold-based dedup. Computed live."""
+    """The measurement that kills threshold-based dedup.
+
+    Computed once per (embedder, pair set) and then served from cache. It used
+    to be computed on every page view, which meant fourteen Bedrock
+    InvokeModel calls per visitor on a public URL with no token in front of it
+    -- an unauthenticated stranger could spend our AWS budget by holding down
+    refresh. The pairs are a fixed constant and the embedder is deterministic,
+    so recomputing was buying an identical answer every time.
+
+    The result carries `computed_at` so the page cannot present a cached number
+    as a live one.
+    """
     while _embedder is None:
         await asyncio.sleep(0.3)
-    pairs = [
-        ("verified via passport", "ID verification complete", "paraphrase"),
-        ("verified via passport", "identity confirmed, passport on file", "paraphrase"),
-        ("Customer 4471 verified", "Customer 4472 verified", "different customer"),
-        ("verified their identity", "FAILED identity verification", "negation"),
-        ("refund of $1,240 approved", "refund of $1,240 declined", "negation"),
-        ("refund of $1,240 approved", "refund of $2,140 approved", "different amount"),
-        ("9902 lives in Berlin", "9902 used to live in Berlin", "tense change"),
-    ]
-    out = []
-    for a, b, kind in pairs:
-        d = float(np.linalg.norm(_embedder.embed(a) - _embedder.embed(b)))
-        out.append({"a": a, "b": b, "kind": kind, "distance": round(d, 3),
-                    "same_fact": kind == "paraphrase"})
-    return {"pairs": sorted(out, key=lambda x: x["distance"]), "embedder": _embedder.name}
+    async with _distances_lock:
+        # The lock is defence, not a fix: nothing awaits between the lookup and
+        # the store, so today the event loop cannot interleave two visitors here
+        # with or without it -- experiments/spend_eval.py reports that rather
+        # than claiming a stampede was prevented. It earns its place the day
+        # embed() becomes awaitable, which is when the window opens.
+        cached = _load_distances(_embedder.name)
+        if cached is not None:
+            return cached
+        out = []
+        for a, b, kind in DISTANCE_PAIRS:
+            d = float(np.linalg.norm(_embedder.embed(a) - _embedder.embed(b)))
+            out.append({"a": a, "b": b, "kind": kind, "distance": round(d, 3),
+                        "same_fact": kind == "paraphrase"})
+        payload = {"pairs": sorted(out, key=lambda x: x["distance"]),
+                   "embedder": _embedder.name,
+                   "computed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+        _store_distances(_embedder.name, payload)
+        return payload
 
 
 @app.get("/api/story")
