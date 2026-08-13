@@ -151,6 +151,16 @@
   footer{max-width:1180px;margin:70px auto 0;padding-top:24px;border-top:1px solid var(--line);
     font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-dim);line-height:1.9;
     overflow-wrap:anywhere}
+
+.feed{border:1px solid var(--line);padding:14px 16px}
+.feedhead{display:flex;align-items:baseline;gap:10px}
+.feednum{font-size:34px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.feedlabel{color:var(--ink-dim);font-size:13px}
+.feedrow{border-top:1px solid var(--line);padding:8px 0;font-size:13px}
+.feedrow .subj{font-weight:600}
+.feedrow .chal{color:var(--ink-dim);display:block;margin-top:2px}
+.feedvia{font-size:11px;color:var(--ink-dim);margin-top:10px}
+.feed.unavailable .feednum{color:var(--ink-dim)}
 </style>
 </head>
 <body>
@@ -238,6 +248,20 @@
     <div class="fx" id="fx"></div>
     <p class="punch" id="punch"></p>
   </section>
+  <section>
+    <h2>05 — What your fleet currently disagrees about</h2>
+    <p class="lede">Every other panel on this page reads the database over SQL. This one does not:
+      it is served by CockroachDB&rsquo;s Managed MCP Server, an endpoint that cannot write. The
+      surface that shows you the disagreements is structurally incapable of editing them.</p>
+    <div class="feed" id="feed">
+      <div class="feedhead">
+        <span class="feednum" id="feednum">&mdash;</span>
+        <span class="feedlabel" id="feedlabel">run 03 to open one</span>
+      </div>
+      <div id="feedrows"></div>
+      <div class="feedvia mono" id="feedvia"></div>
+    </div>
+  </section>
 </main>
 
 <footer>
@@ -254,6 +278,36 @@ fetch('/api/health').then(r=>r.json()).then(h=>{
   $('#f-embed').textContent=h.embedder||'—';
   $('#f-adj').textContent=h.adjudicator;
 });
+
+
+// ---- 05: the contradiction feed, over MCP --------------------------------
+// The count is deliberately allowed to read 0. The honest number for this
+// session after adjudication IS zero, and a feed that could only ever show a
+// non-zero number would be a graphic, not an instrument.
+function loadFeed(token){
+  const box=$('#feed');
+  if(!token){ $('#feedlabel').textContent='no session grant returned'; return; }
+  fetch('/api/contradictions?token='+encodeURIComponent(token))
+    .then(r=>r.json()).then(f=>{
+      if(!f.available){
+        box.classList.add('unavailable');
+        $('#feednum').textContent='—';
+        $('#feedlabel').textContent='not available';
+        $('#feedvia').textContent=f.reason||'';
+        return;
+      }
+      box.classList.remove('unavailable');
+      $('#feednum').textContent=f.open;
+      $('#feedlabel').textContent=f.open===1?'open contradiction in this session'
+                                            :'open contradictions in this session';
+      $('#feedrows').innerHTML=(f.contradictions||[]).map(c=>
+        `<div class="feedrow"><span class="subj">${c.subject} · ${c.predicate}</span>
+         <span class="chal">challenged by ${c.challenger_by} at L2 ${c.distance} — ${c.challenger}</span></div>`
+      ).join('');
+      $('#feedvia').textContent='read through '+f.via+' · scope '+f.scope+' · this endpoint cannot write';
+    })
+    .catch(e=>{ $('#feedlabel').textContent='feed unreachable'; $('#feedvia').textContent=String(e); });
+}
 
 // ---- the ruler -----------------------------------------------------------
 let pairs=[];
@@ -385,6 +439,7 @@ $('#tell').onclick=()=>{
     }
   });
   on('done',d=>{
+    loadFeed(d.scope_token);
     $('#punch').innerHTML=`${d.retracted} beliefs retracted, ${d.cancelled} pending effect cancelled, and <b>${d.compensate} effect that already executed flagged for compensation</b>. The refund is not un-sent. The system says so instead of pretending.`;
     $('#tell').disabled=false; $('#storystate').textContent='builds a real belief chain, injects a real negation, retracts for real';
     es.close();

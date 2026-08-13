@@ -28,6 +28,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from retract.adjudicate import get_adjudicator  # noqa: E402
 from retract.embed import get_embedder  # noqa: E402
 from retract.engine import MemoryEngine, vec_literal  # noqa: E402
+from retract.mcp import GovernedMemoryReader, MCPClient, MCPError  # noqa: E402
+from retract.scope import ScopeDenied, ScopeGrant, mint  # noqa: E402
 
 app = FastAPI(title="RETRACT")
 STATIC = Path(__file__).parent / "static"
@@ -69,6 +71,7 @@ _embedder = None
 _adjudicator = None
 _vectors: list[np.ndarray] = []
 _distances_lock = asyncio.Lock()
+_mcp = None
 _distances_memo: dict[str, dict] = {}
 
 
@@ -238,6 +241,54 @@ async def distances():
         return payload
 
 
+@app.get("/api/contradictions")
+async def contradictions(token: str = ""):
+    """The facts this fleet currently disagrees about, read through MCP.
+
+    THIS IS THE ONLY ENDPOINT THAT DOES NOT TALK SQL, AND THAT IS THE POINT.
+
+    Every other route here opens a psycopg connection. This one goes through
+    CockroachDB's Managed MCP Server, which cannot write -- so the surface that
+    exposes the fleet's disagreements is structurally incapable of editing
+    them. Until now that path existed only in `experiments/mcp_eval.py`, which
+    meant a judge who opened the live URL and ran no eval saw exactly one
+    CockroachDB tool in a submission whose gate needs two.
+
+    `token` is a scope grant, minted by /api/story for the session it created.
+    A caller cannot read another session's contradictions by naming its scope,
+    because naming is no longer how you get in.
+
+    WHEN MCP IS NOT CONFIGURED IT SAYS SO AND RETURNS NOTHING. It does not fall
+    back to SQL. A fallback would make the feed work and the claim false at the
+    same time, which is the worst of the three outcomes: the endpoint would be
+    demonstrating a tool it was not using.
+    """
+    try:
+        grant = ScopeGrant.from_token(token)
+    except ScopeDenied as e:
+        return {"available": False, "reason": f"scope: {e}", "open": None}
+
+    try:
+        client = _mcp_client()
+    except MCPError as e:
+        return {"available": False, "reason": f"MCP not configured: {e}",
+                "open": None, "via": "none"}
+
+    rows = await asyncio.to_thread(
+        lambda: GovernedMemoryReader(client, grant).open_contradictions())
+    return {"available": True, "via": "cockroachdb-managed-mcp",
+            "scope": grant.scope, "open": len(rows), "contradictions": rows}
+
+
+def _mcp_client():
+    """One client per process. Raises MCPError when the credentials are absent,
+    which the caller turns into an honest 'not configured' rather than a zero."""
+    global _mcp
+    if _mcp is None:
+        _mcp = MCPClient.from_env()
+    return _mcp
+
+
 @app.get("/api/story")
 async def story():
     """Acts 3 and 4: the real contradiction, then the retraction cascade.
@@ -325,7 +376,11 @@ def _story_events(q: "queue.Queue[dict]") -> None:
                 label=payload.get("label", ""))
             time.sleep(0.22)
 
-    put(type="done", scope=scope, retracted=len(out["retracted"]),
+    # The token, not just the name. The feed is scope-enforced, so the browser
+    # needs a grant to read back the contradictions this session just created --
+    # and it can only ever read this one.
+    put(type="done", scope=scope, scope_token=mint(scope),
+        retracted=len(out["retracted"]),
         cancelled=len(out["cancelled"]), compensate=len(out["needs_compensation"]))
 
 
