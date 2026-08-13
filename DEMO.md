@@ -123,19 +123,22 @@ is gone and the system says so.
 a system noticing something. This is the only one where it acts. Cut the
 receipts before you cut this.
 
-Two separate things have to exist first, and they are not the same thing:
+**There is no button, and there should not be one.** An earlier draft of this
+section said to click **Compensate**. That was wrong, and it was wrong because
+it was written from PR #2's description of itself — which says the PR "did not
+wire compensation into the UI" — rather than from PR #2's diff, which does.
+`app/main.py` runs the compensation inside the story stream and the page already
+renders the reversal. Read the diff, not the summary of the diff.
 
-- **The handler** — PR #2, written, and never run against the live cluster.
-- **The button** — does NOT exist. PR #2 deliberately left the UI alone; PLAN.md
-  Day 3 owns "act 5 on the demo surface". Nothing on the page triggers a
-  compensation today, so this act cannot be shot at all until that lands.
+Keeping it automatic is also the better film. This script's own rule is that two
+buttons drive the whole thing; a third click between the flag and the reversal
+would put a human decision in the middle of the one moment that is supposed to
+show the system acting on its own.
 
-The shot below is written against the surface as it will be, so the wiring has a
-target to hit. Treat every number in it as a placeholder until the eval prints
-real ones — this script's own rule is never to edit a number, and that applies
-to the person writing the script too.
+So act 5 needs nothing clicked. It is the tail of **Run the story, live**, and
+what it needs instead is PR #2 merged and verified against the live cluster.
 
-Click **Compensate**. One row is written, and the table settles:
+No click. The story keeps running, and the table settles:
 
     refund_issued     $1,240 sent to customer 4471      COMPENSATED
     refund_reversed   $1,240 returned to customer 4471  EXECUTED
@@ -199,7 +202,8 @@ Nothing else in this script changes.
 - [ ] Adjudicator line checked — stand-in for rehearsal, Claude for the final
 - [ ] 1440 wide
 - [ ] Both buttons re-enabled (they disable while running)
-- [ ] **Act 5 wired and `verify_live.sh` green** — or the film ends on a flag
+- [ ] **PR #2 merged and `verify_live.sh` green** — act 5 is already wired in
+      that PR; what it lacks is a live run, not a button
 - [ ] **Total runtime under 3:00** — Devpost rejects over. This cut lands 2:55,
       so there is five seconds of margin and no room for an intro card
 
