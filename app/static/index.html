@@ -214,7 +214,8 @@
   <h1>Two agents.<br>One customer.<br><em>Different truths.</em></h1>
   <p class="sub">RETRACT is a shared memory for agent fleets. Exactly one lock holder commits
     a given fact at a time — and when a belief turns out to be wrong, it takes
-    back everything built on it, including the money that already moved.</p>
+    back everything built on it — including the side effects that already
+    executed, which it reaches and records a reversal for.</p>
   <div class="facts" id="facts">
     <span>cluster <b id="f-cluster">…</b></span>
     <span>embedder <b id="f-embed">…</b></span>
@@ -250,7 +251,9 @@
     <div class="controls">
       <button id="run">Run both, live</button>
       <span class="mono" style="font-size:11px;color:var(--ink-dim)" id="runstate">
-        real transactions against CockroachDB — nothing here is simulated</span>
+        every belief, contradiction and effect row below is a real transaction against
+        CockroachDB Cloud. No payment provider is called — the reversal is a ledger
+        record, not a transfer</span>
     </div>
     <div class="panes">
       <div class="pane">
@@ -443,7 +446,7 @@ $('#run').onclick=()=>{
   ['#n-big','#r-big','#n-keys','#r-keys','#r-con'].forEach(s=>$(s).textContent='0');
   let done=0;
   const finish=()=>{ if(++done===2){ $('#run').disabled=false;
-    $('#runstate').textContent='real transactions against CockroachDB — nothing here is simulated';
+    $('#runstate').textContent='real rows in CockroachDB Cloud · no payment provider is called';
     const n=$('#n-big').textContent, r=$('#r-big').textContent;
     $('#race-punch').innerHTML=`Same eight agents. Same cluster. Same instant. <b>${n} beliefs</b> on the left, ${r} on the right.`;
   } };
@@ -487,7 +490,12 @@ $('#tell').onclick=()=>{
     let r=$(`.fxrow[data-tool="${d.tool}"]`);
     if(!r){
       r=document.createElement('div'); r.className='fxrow';
-      r.innerHTML=`<span class="t">${d.tool}</span><span class="l">${d.label}</span><span class="s ${d.status}">${d.status.toUpperCase()}</span>`;
+      // A reversal row is RECORDED, not settled: the ledger write happened and
+      // nothing was dispatched. Showing the raw 'executed' beside "reversal of
+      // refund_issued" is the pair that reads as money having moved.
+      const shown = (d.tool && d.tool.endsWith('_requested') && d.status==='pending')
+        ? 'RECORDED · NOT DISPATCHED' : d.status.toUpperCase().replace(/_/g,' ');
+      r.innerHTML=`<span class="t">${d.tool}</span><span class="l">${d.label}</span><span class="s ${d.status}">${shown}</span>`;
       r.dataset.tool=d.tool; $('#fx').appendChild(r);
     }
   });
@@ -522,24 +530,29 @@ $('#tell').onclick=()=>{
       r.classList.add('kept');
     }
   });
-  on('compensated',d=>{
-    $('#adj').innerHTML+=`<div class="adjbox"><div class="r">Compensation: ${d.outcome}</div><div class="why">${d.reason||''}${d.reversal_id?' · reversal '+d.reversal_id:''}</div></div>`;
+  on('compensation_recorded',d=>{
+    // The label says what happened. `recorded` means a request row exists and
+    // no provider was called; it is not a reversal and must not read as one.
+    const head = d.outcome==='recorded' || d.outcome==='already_recorded'
+      ? 'Reversal recorded — not dispatched'
+      : `Compensation: ${d.outcome}`;
+    $('#adj').innerHTML+=`<div class="adjbox"><div class="r">${head}</div><div class="why">${d.reason||''}${d.request_id?' · request '+d.request_id:''}</div></div>`;
   });
   on('done',d=>{
     loadFeed(d.scope_token);
-    const nComp=d.compensated||0;
+    const nRec=d.recorded||0;
     // The unreachable count is the half this line used to omit. With two
     // executed effects and one registered handler it read "1 executed effect
     // reversed" and said nothing about the one that could not be, which is the
     // stronger half of the claim reported without the honest half.
-    const nStuck=Math.max(0,(d.compensate||0)-nComp);
+    const nStuck=d.unreachable||0;
     const stuck=nStuck
-      ? ` <b>${nStuck} executed effect could not be reversed</b> and stays flagged — no compensation is registered for that tool, and the system will not pretend it fixed something it cannot reach.`
+      ? ` <b>${nStuck} executed effect has no registered handler at all</b> — not even a request is written for it, and the system will not pretend it reached something it cannot.`
       : '';
-    $('#punch').innerHTML=nComp
-      ? `${d.retracted} beliefs retracted, ${d.cancelled} pending effect cancelled, and <b>${nComp} executed effect reversed</b> — ledger shows needs_compensation → compensated with the reversal’s own id. The money is not pretended away; the reversal is recorded.${stuck}`
+    $('#punch').innerHTML=nRec
+      ? `${d.retracted} beliefs retracted, ${d.cancelled} pending effect cancelled, and <b>${nRec} executed effect reached and a reversal recorded</b> — a request row under its own idempotency key <code>comp:&lt;original&gt;</code>. It stays <b>needs_compensation</b> until a provider returns a receipt, and no provider is configured, so nothing here settles.${stuck}`
       : `${d.retracted} beliefs retracted, ${d.cancelled} pending effect cancelled, and <b>${d.compensate} effect that already executed flagged for compensation</b>. The refund is not un-sent. The system says so instead of pretending.`;
-    $('#tell').disabled=false; $('#storystate').textContent='builds a real belief chain, injects a real negation, retracts and compensates for real'
+    $('#tell').disabled=false; $('#storystate').textContent='builds a real belief chain, injects a real negation, retracts, and records the reversals owed'
     es.close();
   });
   on('error',d=>{

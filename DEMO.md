@@ -144,7 +144,15 @@ is gone and the system says so.
 > An agent memory that cannot reach its own side effects is a diary, not a
 > system of record.
 
-## 2:20 – 2:45 · THE MONEY COMES BACK
+## 2:20 – 2:45 · THE REVERSAL IS RECORDED
+
+*This act was titled "THE MONEY COMES BACK" until 14 Aug. No money comes
+back: RETRACT writes a reversal record in CockroachDB under its own
+idempotency key and calls no payment provider. Do not say the money was
+returned on camera. The true sentence is stronger anyway — the system
+reached an effect that had already executed, decided a reversal was owed,
+and recorded it exactly once — and it is the one a judge cannot catch you
+on.*
 
 **This is the ending, and the film does not have it yet.** Every other act shows
 a system noticing something. This is the only one where it acts. Cut the

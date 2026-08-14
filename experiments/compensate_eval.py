@@ -111,7 +111,7 @@ def main() -> int:
             "compensated_by": row[4], "payload": row[5],
         } for row in cur.fetchall()}
         cur.execute(
-            "SELECT count(*) FROM effect WHERE scope=%s AND tool='refund_reversed'",
+            "SELECT count(*) FROM effect WHERE scope=%s AND tool='refund_reversal_requested'",
             (scope,),
         )
         n_reversals = cur.fetchone()[0]
@@ -124,23 +124,34 @@ def main() -> int:
     unknown = rows[e_unknown]
     reversal = rows.get(refund["compensated_by"]) if refund["compensated_by"] else None
 
+    # These expectations changed on 14 Aug and the change is the point, not an
+    # accommodation. compensate() used to mark the original `compensated` and
+    # the reversal `executed` in the same transaction that decided a reversal
+    # was owed -- with no payment provider anywhere in the repository. This eval
+    # asserted that, so it was pinning a false state machine in place. It now
+    # asserts what is actually true without a provider: an INTENT is recorded
+    # and nothing is settled. `experiments/outbox_eval.py` owns the settlement
+    # transition and proves it is reachable only with a receipt.
     checks = [
-        ("refund ends compensated",
-         refund["status"] == "compensated"),
-        ("reversal row exists and points back",
+        ("refund STAYS needs_compensation until a provider settles it",
+         refund["status"] == "needs_compensation"),
+        ("request row exists, is pending, and points back",
          reversal is not None
-         and reversal["tool"] == "refund_reversed"
+         and reversal["tool"] == "refund_reversal_requested"
+         and reversal["status"] == "pending"
          and reversal["payload"].get("reverses") == str(e_refund)),
-        ("compensated_by records the reversal id",
-         refund["compensated_by"] == (reversal and rows[e_refund]["compensated_by"])
-         and refund["compensated_by"] is not None),
+        ("nothing carries an external receipt",
+         reversal is not None and not reversal["payload"].get("external_receipt")),
+        ("compensated_by points at the request",
+         refund["compensated_by"] is not None
+         and reversal is not None),
         ("reversal idempotency key is comp:<original>",
          reversal is not None
          and reversal["key"] == compensation_key("rf-4471-1240")),
-        ("second compensate produced ONE reversal, not two",
+        ("second compensate produced ONE request, not two",
          n_reversals == 1
-         and r1.outcome == "compensated"
-         and r1_again.outcome == "already_compensated"
+         and r1.outcome == "recorded"
+         and r1_again.outcome == "already_recorded"
          and r1_again.reversal_id == r1.reversal_id),
         ("unregistered tool stays needs_compensation (control)",
          unknown["status"] == "needs_compensation"

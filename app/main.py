@@ -547,28 +547,36 @@ def _story_events(q: "queue.Queue[dict]") -> None:
             label=payload.get("label", ""), effect_id=str(eid))
         time.sleep(0.22)
 
-    # Close the loop the flag opens. One compensation per needs_compensation
-    # row that has a registered handler; unknown tools stay flagged (surfaced
-    # below as still needs_compensation). Day 3 owns a dedicated act-5 UI;
-    # calling the handler here is what makes the Day-2 public-URL check true.
-    compensated = 0
+    # Record what is owed. This does NOT settle anything: with no provider
+    # configured, `compensate()` writes a request row as `pending` and returns
+    # `recorded`. The event name has to match that or the page is back to
+    # claiming a reversal it did not perform -- which is exactly what
+    # `type="compensated"` said here while the outcome was `recorded`.
+    recorded = 0
+    unreachable = 0
     for eid, tool, status, payload in effect_rows:
         if status != "needs_compensation":
             continue
         result = eng.compensate(eid)
-        put(type="compensated", tool=tool,
+        put(type="compensation_recorded", tool=tool,
             outcome=result.outcome,
             compensating_tool=result.compensating_tool,
-            reversal_id=str(result.reversal_id) if result.reversal_id else None,
+            request_id=str(result.reversal_id) if result.reversal_id else None,
+            dispatched=False,
             reason=result.reason)
-        if result.outcome in ("compensated", "already_compensated"):
-            compensated += 1
-            put(type="effect_final", tool=tool, status="compensated",
+        if result.outcome in ("recorded", "already_recorded"):
+            recorded += 1
+            # The original stays flagged. Nothing has been compensated: a
+            # request exists and no provider has been called.
+            put(type="effect_final", tool=tool, status="needs_compensation",
                 label=payload.get("label", ""),
-                reversal_id=str(result.reversal_id) if result.reversal_id else None)
+                request_id=str(result.reversal_id) if result.reversal_id else None)
             if result.compensating_tool and result.reversal_id:
-                put(type="effect", tool=result.compensating_tool, status="executed",
-                    label=f"reversal of {tool}", effect_id=str(result.reversal_id))
+                put(type="effect", tool=result.compensating_tool, status="pending",
+                    label=f"reversal of {tool} — recorded, not dispatched",
+                    effect_id=str(result.reversal_id))
+        else:
+            unreachable += 1
         time.sleep(0.22)
 
     # Both sides of this merge added a field and neither is optional. PR #2's
@@ -579,7 +587,9 @@ def _story_events(q: "queue.Queue[dict]") -> None:
         retracted=len(out["retracted"]),
         cancelled=len(out["cancelled"]),
         compensate=len(out["needs_compensation"]),
-        compensated=compensated)
+        recorded=recorded,
+        unreachable=unreachable,
+        compensated=0)  # nothing settles without a provider receipt
 
 
 async def _story_stream(request_id: str | None = None):

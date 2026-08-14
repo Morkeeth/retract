@@ -1,0 +1,409 @@
+{
+  "url": "http://localhost:8117",
+  "runs": [
+    {
+      "n": 1,
+      "hiccups": [
+        {
+          "kind": "sse_closed",
+          "url": "http://localhost:8117/api/run/story?token=REDACTED",
+          "error": "net::ERR_ABORTED"
+        }
+      ],
+      "header": {
+        "#f-cluster": "CockroachDB CCL v26.2.5",
+        "#f-embed": "bedrock:amazon.titan-embed-text-v2:0",
+        "#f-adj": "bedrock:claude"
+      },
+      "reveal_s": 1.58,
+      "race_s": 2.34,
+      "race_result": {
+        "naive_beliefs": "8",
+        "retract_beliefs": "1",
+        "naive_keys": "8",
+        "retract_keys": "1",
+        "contradictions": "7"
+      },
+      "story_s": 15.68,
+      "effects_table": "refund_issued$1,240 sent to customer 4471COMPENSATEDcard_charge$89 processed for customer 4471NEEDS COMPENSATIONtier_upgradepriority support queuedCANCELLEDwelcome_emailwelcome email to customer 9902PENDINGrefund_reversedreversal of refund_issuedEXECUTED",
+      "punch": "4 beliefs retracted, 1 pending effect cancelled, and 1 executed effect reversed \u2014 ledger shows needs_compensation \u2192 compensated with the reversal\u2019s own id. The money is not pretended away; the reversal is recorded. 1 executed effect could not be reversed and stays flagged \u2014 no compensation is registered for that tool, and the system will not pretend it fixed something it cannot reach.",
+      "marks": [
+        {
+          "stream": "/api/run/race_naive",
+          "type": "agent",
+          "status": null,
+          "t": 0.06109999999403953
+        },
+        {
+          "stream": "/api/run/race_naive",
+          "type": "agent",
+          "status": null,
+          "t": 0.061400000005960464
+        },
+        {
+          "stream": "/api/run/race_naive",
+          "type": "agent",
+          "status": null,
+          "t": 0.061400000005960464
+        },
+        {
+          "stream": "/api/run/race_naive",
+          "type": "agent",
+          "status": null,
+          "t": 0.0615
+        },
+        {
+          "stream": "/api/run/race_naive",
+          "type": "agent",
+          "status": null,
+          "t": 0.0615
+        },
+        {
+          "stream": "/api/run/race_naive",
+          "type": "agent",
+          "status": null,
+          "t": 0.061599999994039534
+        },
+        {
+          "stream": "/api/run/race_naive",
+          "type": "agent",
+          "status": null,
+          "t": 0.061599999994039534
+        },
+        {
+          "stream": "/api/run/race_naive",
+          "type": "agent",
+          "status": null,
+          "t": 0.061599999994039534
+        },
+        {
+          "stream": "/api/run/race_retract",
+          "type": "agent",
+          "status": null,
+          "t": 0.061299999997019766
+        },
+        {
+          "stream": "/api/run/race_retract",
+          "type": "agent",
+          "status": null,
+          "t": 0.061400000005960464
+        },
+        {
+          "stream": "/api/run/race_retract",
+          "type": "agent",
+          "status": null,
+          "t": 0.061400000005960464
+        },
+        {
+          "stream": "/api/run/race_retract",
+          "type": "agent",
+          "status": null,
+          "t": 0.061400000005960464
+        },
+        {
+          "stream": "/api/run/race_retract",
+          "type": "agent",
+          "status": null,
+          "t": 0.0615
+        },
+        {
+          "stream": "/api/run/race_retract",
+          "type": "agent",
+          "status": null,
+          "t": 0.0615
+        },
+        {
+          "stream": "/api/run/race_retract",
+          "type": "agent",
+          "status": null,
+          "t": 0.0615
+        },
+        {
+          "stream": "/api/run/race_retract",
+          "type": "agent",
+          "status": null,
+          "t": 0.061599999994039534
+        },
+        {
+          "stream": "/api/run/race_naive",
+          "type": "result",
+          "status": null,
+          "t": 0.6720999999940396
+        },
+        {
+          "stream": "/api/run/race_naive",
+          "type": "result",
+          "status": null,
+          "t": 0.7242999999970198
+        },
+        {
+          "stream": "/api/run/race_naive",
+          "type": "result",
+          "status": null,
+          "t": 0.7750999999940396
+        },
+        {
+          "stream": "/api/run/race_naive",
+          "type": "result",
+          "status": null,
+          "t": 0.7754000000059604
+        },
+        {
+          "stream": "/api/run/race_naive",
+          "type": "result",
+          "status": null,
+          "t": 0.8262000000029802
+        },
+        {
+          "stream": "/api/run/race_naive",
+          "type": "result",
+          "status": null,
+          "t": 0.8265
+        },
+        {
+          "stream": "/api/run/race_naive",
+          "type": "result",
+          "status": null,
+          "t": 0.8772000000029803
+        },
+        {
+          "stream": "/api/run/race_naive",
+          "type": "result",
+          "status": null,
+          "t": 0.8775
+        },
+        {
+          "stream": "/api/run/race_naive",
+          "type": "done",
+          "status": null,
+          "t": 0.879
+        },
+        {
+          "stream": "/api/run/race_retract",
+          "type": "result",
+          "status": null,
+          "t": 1.3375
+        },
+        {
+          "stream": "/api/run/race_retract",
+          "type": "result",
+          "status": null,
+          "t": 1.4895
+        },
+        {
+          "stream": "/api/run/race_retract",
+          "type": "result",
+          "status": null,
+          "t": 1.5917999999970198
+        },
+        {
+          "stream": "/api/run/race_retract",
+          "type": "result",
+          "status": null,
+          "t": 1.7452000000029801
+        },
+        {
+          "stream": "/api/run/race_retract",
+          "type": "result",
+          "status": null,
+          "t": 1.8475
+        },
+        {
+          "stream": "/api/run/race_retract",
+          "type": "result",
+          "status": null,
+          "t": 2.0002000000029803
+        },
+        {
+          "stream": "/api/run/race_retract",
+          "type": "result",
+          "status": null,
+          "t": 2.1024000000059604
+        },
+        {
+          "stream": "/api/run/race_retract",
+          "type": "result",
+          "status": null,
+          "t": 2.3074000000059605
+        },
+        {
+          "stream": "/api/run/race_retract",
+          "type": "done",
+          "status": null,
+          "t": 2.308
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "belief",
+          "status": null,
+          "t": 0.775
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "belief",
+          "status": null,
+          "t": 1.836
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "belief",
+          "status": null,
+          "t": 2.852800000011921
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "belief",
+          "status": null,
+          "t": 3.9819000000059606
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "belief",
+          "status": null,
+          "t": 4.951
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "effect",
+          "status": "executed",
+          "t": 5.4105
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "effect",
+          "status": "executed",
+          "t": 5.666
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "effect",
+          "status": "pending",
+          "t": 5.920800000011921
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "effect",
+          "status": "pending",
+          "t": 6.226300000011921
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "inject",
+          "status": null,
+          "t": 6.9355
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "verdict_pending",
+          "status": null,
+          "t": 7.64540000000596
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "adjudicated",
+          "status": null,
+          "t": 11.175800000011922
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "retracting",
+          "status": null,
+          "t": 11.63240000000596
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "fallout",
+          "status": null,
+          "t": 12.189800000011921
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "fallout",
+          "status": null,
+          "t": 12.393
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "fallout",
+          "status": null,
+          "t": 12.59420000000298
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "fallout",
+          "status": null,
+          "t": 12.847300000011922
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "fallout",
+          "status": null,
+          "t": 13.0495
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "effect_final",
+          "status": "needs_compensation",
+          "t": 13.55660000000894
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "effect_final",
+          "status": "needs_compensation",
+          "t": 13.75990000000596
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "effect_final",
+          "status": "cancelled",
+          "t": 14.01510000000894
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "effect_final",
+          "status": "pending",
+          "t": 14.21960000000894
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "compensated",
+          "status": null,
+          "t": 14.78060000000894
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "compensated",
+          "status": null,
+          "t": 15.444200000002981
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "effect_final",
+          "status": "compensated",
+          "t": 15.444200000002981
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "effect",
+          "status": "executed",
+          "t": 15.44460000000894
+        },
+        {
+          "stream": "/api/run/story",
+          "type": "done",
+          "status": null,
+          "t": 15.64880000001192
+        }
+      ],
+      "act5": {
+        "measured": true,
+        "flag_at_s": 13.56,
+        "compensated_at_s": 14.78,
+        "stream_end_s": 15.65,
+        "act5_duration_s": 2.09,
+        "demo_md_budget_s": 25.0
+      },
+      "video": "/Users/morkeeth/CODE/retract/rehearsal-design/page@0e840338b4dd92deb3e139b12cc77aca.webm"
+    }
+  ]
+}

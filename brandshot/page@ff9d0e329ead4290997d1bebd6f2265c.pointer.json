@@ -1,0 +1,59 @@
+{
+  "video": "/Users/morkeeth/CODE/retract/brandshot/page@ff9d0e329ead4290997d1bebd6f2265c.webm",
+  "frame": {
+    "width": 1440,
+    "height": 900
+  },
+  "t0": "page creation; not frame-exact -- calibrate once against a visible transition",
+  "marks": [
+    {
+      "t_ms": 10665,
+      "x": 301,
+      "y": 879,
+      "kind": "scroll",
+      "target": "#reveal"
+    },
+    {
+      "t_ms": 10678,
+      "x": 301,
+      "y": 879,
+      "kind": "click",
+      "target": "#reveal"
+    },
+    {
+      "t_ms": 12283,
+      "x": 207,
+      "y": 450,
+      "kind": "scroll",
+      "target": "#run"
+    },
+    {
+      "t_ms": 12287,
+      "x": 207,
+      "y": 450,
+      "kind": "click",
+      "target": "#run"
+    },
+    {
+      "t_ms": 14510,
+      "x": 227,
+      "y": 450,
+      "kind": "scroll",
+      "target": "#tell"
+    },
+    {
+      "t_ms": 14516,
+      "x": 227,
+      "y": 450,
+      "kind": "click",
+      "target": "#tell"
+    },
+    {
+      "t_ms": 29867,
+      "x": 720,
+      "y": 450,
+      "kind": "scroll",
+      "target": "#fx"
+    }
+  ]
+}
