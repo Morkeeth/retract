@@ -59,8 +59,28 @@ required two.** The gate is satisfied by 1 and 2 without it.
 
 **Amazon Bedrock**, generating every vector the index holds.
 
-    retract/embed.py     Amazon Titan Text Embeddings V2, 512 dimensions
-    retract/adjudicate.py  Claude on Bedrock, adjudicating contradictions
+    retract/embed.py     Amazon Titan Text Embeddings V2, 512 dimensions -- running
+
+Titan alone satisfies this gate: every embedding in the live cluster came from
+it, and `/status` on the deployed URL names the model.
+
+    retract/adjudicate.py  Claude on Bedrock -- code path built, NOT running
+
+Say this plainly rather than let a judge find it. `RETRACT_ADJUDICATOR=auto`
+resolves to a heuristic stand-in today, because Bedrock answers a Converse call
+to `us.anthropic.claude-sonnet-4-5-20250929-v1:0` with `Model use case details
+have not been submitted for this account` (probed 14 Aug, us-east-1). The
+account has never submitted the Anthropic use-case form, so the model has never
+once adjudicated. Every surface says so in the same words: `/status` returns
+`"adjudicator": "heuristic (stand-in, not a model)"` and
+`"adjudicator_is_model": false`, and the page prints it beside the verdict.
+
+The stand-in scores 7/8 on `experiments/adjudicate_eval.py`, failing the case
+that needs real reasoning -- "verified by passport" versus "verified by driving
+licence". If the form clears before submission, `RETRACT_ADJUDICATOR=bedrock`
+is the only change and the eval is re-run for the 8/8. If it does not clear,
+this paragraph is the submission's answer and nothing on any surface claims
+otherwise.
 
 The credential on the deploy host carries `bedrock:InvokeModel` on two model
 ARNs, and five escalation paths were probed and verified blocked.
