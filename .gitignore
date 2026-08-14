@@ -13,3 +13,7 @@ wheels/
 # local scratch
 .pytest_cache/
 designs/
+
+# Rehearsal captures. experiments/rehearse.py writes video here; the footage is
+# a local artefact for timing the shot list, not something the repo carries.
+rehearsal/

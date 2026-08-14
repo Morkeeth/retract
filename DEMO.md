@@ -6,6 +6,27 @@ the RETRACT race in 1.85s, and acts 3+4 run 9.16s start to finish. Total
 interactive time is 9.2s inside a 180s budget, so the film is mostly holding
 still on numbers that are already true.
 
+**Re-measured 14 Aug against the deployed URL, and the numbers above no longer
+describe it.** Seven passes of `experiments/rehearse.py` on
+`retract-production.up.railway.app`, timed off the server-sent events rather
+than off the DOM, are consistent to within 0.1s:
+
+| Beat | Click to settled | Was |
+|---|---|---|
+| Reveal | 1.5s | 0.63s (act 1 render, a different span) |
+| **Run both, live** | 8.3s | 0.90s / 1.85s per pane |
+| **Run the story, live** | 27.7s | 9.16s for acts 3+4 |
+
+Total interactive time is **37.5s**, not 9.2s. The claim that the film is mostly
+holding still on finished numbers survives — 37.5s of system time inside a 180s
+cut still leaves most of the runtime as holds — but the shot list can no longer
+be timed off the old figures. The story alone eats 27.7s, and five beliefs build
+at ~2.9s apart before the negation arrives at **17.2s**, not the 5.3s written at
+act 3 below.
+
+Both the old and new figures are wall-clock for what a viewer sees, but they are
+not the same spans, so this table replaces rather than corrects them.
+
 Rules: no talking head, no slides, no architecture diagram as the opener. Two
 buttons drive the whole thing. If a number comes out wrong on a take, re-run the
 take — never edit a number.
@@ -138,14 +159,37 @@ show the system acting on its own.
 So act 5 needs nothing clicked. It is the tail of **Run the story, live**, and
 what it needs instead is PR #2 merged and verified against the live cluster.
 
-No click. The story keeps running, and the table settles:
+No click. The story keeps running, and the table settles — **this is what the
+deployed URL actually renders, captured 14 Aug**:
 
     refund_issued     $1,240 sent to customer 4471      COMPENSATED
-    refund_reversed   $1,240 returned to customer 4471  EXECUTED
-    card_charge       $89 processed                     NEEDS COMPENSATION
+    tier_upgrade      priority support queued           CANCELLED
+    welcome_email     welcome email to customer 9902    PENDING
+    refund_reversed   reversal of refund_issued         EXECUTED
 
-Hold on the third line for two full seconds. It is the most important row on
-screen and it is the one that did **not** work.
+**There is no `card_charge` row, and this script asked you to hold on it for
+two seconds.** An earlier draft of this act listed a fourth effect, `$89
+processed / NEEDS COMPENSATION`, as "the most important row on screen and the
+one that did not work". Grep says `card_charge` exists in exactly two places:
+`experiments/compensate_eval.py`, where it is the control arm proving an
+unregistered tool is refused, and this file. The story scenario in
+`app/main.py` has three effects and none of them is it. So the film's honesty
+beat — the failure left visible on purpose — has no object on screen.
+
+That is a decision, not a typo, and it belongs to the owner:
+
+- **Leave it.** The act ends on `COMPENSATED` + `EXECUTED`, which is a true and
+  strong ending, and the film loses the row that separates a demo from a
+  measurement.
+- **Add it.** One executed effect with no registered handler in the story
+  scenario. It invents no abstraction — `retract/compensate.py` already returns
+  `no_handler` for exactly this, the page already renders `needs_compensation`,
+  and MORNING-RUN's own hostile-read table asks every surface to say both
+  halves: closed-loop for registered tools, flagged for unknown ones. Right now
+  the page says only the first half.
+
+Until that is ruled on, shoot the four rows that exist and do not read the
+missing one aloud.
 
 > The reversal is a new effect with its own id, not a deletion. And the tool
 > with no registered compensation stays flagged — the system will not pretend
@@ -213,10 +257,17 @@ Nothing else in this script changes.
 
 Stated here rather than discovered on the day:
 
-- **Every timing above 2:20 is estimated, not measured.** The rest of the file
-  earns its opening sentence — those were rehearsed on 12 Aug. Act 5 has never
-  been run by anyone, so its 25 seconds is a guess. Re-time it after the first
-  rehearsal and correct this line.
+- ~~**Every timing above 2:20 is estimated, not measured.** Act 5 has never been
+  run by anyone, so its 25 seconds is a guess.~~ **Measured 14 Aug, seven
+  passes.** Act 5 — from the ledger flagging `needs_compensation` to the stream
+  closing — is **2.6s**, not 25s. The two numbers are different clocks: 25s was
+  film time including holds and narration, 2.6s is the system. The consequence
+  for the shoot is concrete: the reversal lands **2.4s** after the red flag
+  appears, so "linger on the executed effect that is still red" cannot be done
+  in the run. Hold it in the edit, or lose it.
+- **The effects table sits below the fold at 1440x900.** The first rehearsal
+  pass recorded act 5 happening entirely off screen. The shot list above never
+  mentions a scroll, and the take needs one between the cascade and the table.
 - **Whether the public URL behaves like localhost under recording.** The demo
   has only ever been driven locally. Network latency on the two race panes is
   the number most likely to move, and the race is the act that depends on a
