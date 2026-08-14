@@ -387,6 +387,30 @@ async def _race_stream(mode: str, request_id: str | None):
             break
 
 
+def _fraud_team_confirmation(scope: str) -> dict:
+    """The external event the demo injects, stated rather than implied.
+
+    In the story a human fraud team confirms the passport is forged. That
+    confirmation arrives from outside RETRACT, and in this demo it is
+    manufactured here -- there is no fraud team and no external system. Saying
+    so in the code is the honest version; pretending the model's verdict is an
+    authority is not.
+
+    EXTERNAL_RETRACTION below is a seam on purpose. Point it at something that
+    returns None and the absence becomes observable: the story then adjudicates,
+    resolves the contradiction, and retracts nothing. That case is a row in
+    experiments/verdict_eval.py's matrix rather than a paragraph nobody can run.
+    """
+    return {
+        "authority": "fraud-team",
+        "receipt": f"FRAUD-{scope.split('-')[-1].upper()}",
+        "reason": "passport confirmed forged by fraud team",
+    }
+
+
+EXTERNAL_RETRACTION = _fraud_team_confirmation
+
+
 def _story_events(q: "queue.Queue[dict]") -> None:
     scope = f"story-{uuid.uuid4().hex[:8]}"
     eng = MemoryEngine(URL, scope, "support-agent", _embedder.name)
@@ -452,16 +476,59 @@ def _story_events(q: "queue.Queue[dict]") -> None:
         incumbent=res.incumbent_content)
     time.sleep(0.4)
 
+    # The verdict now decides something. It used to be printed and then ignored:
+    # the next statement retracted unconditionally, so inverting Claude's answer
+    # changed nothing a judge could observe. `MemoryEngine.resolve()` existed the
+    # whole time and nothing called it.
+    resolution = None
     if res.outcome == "contradiction":
         v = _adjudicator.judge("customer:4471", "identity_verified",
                                res.incumbent_content, neg)
         put(type="adjudicated", resolution=v.resolution, reasoning=v.reasoning,
             by=v.by, is_model=_adjudicator.is_model)
+        resolution = v.resolution
+
+        # Close the contradiction under the same claim lock, whatever the answer.
+        # Leaving it open is how the MCP feed could show an open contradiction
+        # seconds after this page said it had been adjudicated.
+        eng.resolve(res.contradiction_id, v.resolution, E(neg))
+        put(type="resolved", resolution=v.resolution,
+            contradiction=str(res.contradiction_id))
         time.sleep(0.5)
 
-    # --- act 4: the cascade ------------------------------------------------
-    put(type="retracting", reason="passport confirmed forged by fraud team")
-    out = eng.retract(ids[0], "passport confirmed forged by fraud team")
+    # --- act 4: the cascade, on an authority that is not the model ---------
+    # A first version of this gate ran the cascade when the verdict came back
+    # `superseded`. That still let the model authorise compensation -- one step
+    # removed, and the event payload said so out loud with `authorised_by=
+    # resolution`. Naming a string RETRACTION_AUTHORITY does not create one.
+    #
+    # These are two independent inputs and neither substitutes for the other:
+    #
+    #   the model's resolution     decides which belief the memory HOLDS.
+    #                              superseded/rejected/duplicate, applied by
+    #                              resolve() above, under the claim lock.
+    #   an external retraction     decides whether anything is TAKEN BACK. It
+    #   event                      carries an authority and a receipt from
+    #                              outside this system, and it is the sole
+    #                              trigger for retract() and therefore for any
+    #                              compensation.
+    #
+    # With no external event there is no retraction and no compensation, whatever
+    # the model said. With one, the cascade runs on ITS authority, and the
+    # resolution is not consulted and is not recorded on the event.
+    event = EXTERNAL_RETRACTION(scope) if EXTERNAL_RETRACTION else None
+    if event is None:
+        put(type="no_retraction", resolution=resolution,
+            reason="no verified external retraction event. An adjudication decides "
+                   "what the memory believes; it does not authorise taking back an "
+                   "effect that already executed.")
+        put(type="done", scope=scope, scope_token=mint(scope),
+            retracted=0, cancelled=0, compensate=0, compensated=0)
+        return
+
+    put(type="retracting", reason=event["reason"],
+        authority=event["authority"], receipt=event["receipt"])
+    out = eng.retract(ids[0], f"{event['reason']} [{event['authority']} · {event['receipt']}]")
     retracted = {str(x) for x in out["retracted"]}
     for i, (text, subj, pred, _) in enumerate(chain):
         put(type="fallout", text=text, subject=subj,

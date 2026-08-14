@@ -41,8 +41,8 @@ WHAT EACH VERDICT MUST MEAN FOR resolve()
   superseded  the challenger wins: incumbent status='superseded', exactly one
               new memory written, contradiction closed
 
-AND THE PART THAT IS ACTUALLY BROKEN
-`app/main.py` never calls resolve() at all. It asks for a verdict, prints it,
+AND THE PART THAT WAS ACTUALLY BROKEN
+`app/main.py` never called resolve() at all. It asks for a verdict, prints it,
 and calls retract() on the next statement unconditionally -- the stronger of the
 two operations, on every verdict including the two that mean "the original
 belief was fine". The second section below is that claim as a test.
@@ -93,8 +93,11 @@ def state(url: str, scope: str) -> dict:
         cur.execute("SELECT count(*) AS n FROM effect WHERE scope=%s "
                     "AND status IN ('needs_compensation','compensated')", (scope,))
         touched = cur.fetchone()["n"]
+        cur.execute("SELECT count(*) AS n FROM memory WHERE scope=%s", (scope,))
+        rows = cur.fetchone()["n"]
     return {"active": active, "retracted": retracted, "superseded": superseded,
-            "open_contradictions": open_contra, "effects_touched": touched}
+            "rows": rows, "open_contradictions": open_contra,
+            "effects_touched": touched}
 
 
 def build(url: str, scope: str, emb) -> tuple[MemoryEngine, uuid.UUID]:
@@ -157,26 +160,133 @@ def main() -> int:
     # --- the actual defect ------------------------------------------------
     # resolve() works. Nothing calls it. This is that sentence as a check, and
     # it is the one that must go green before the demo does what it says.
-    # A SOURCE check, and weaker than a behavioural one -- say so rather than
-    # let it read as proof. It also has to be precise: the first version matched
-    # `.resolve(` and went green on `Path(__file__).resolve()` two lines into the
-    # imports. That is the same false positive as a grep that cannot see a
-    # wrapped phrase, in a file written to catch exactly that class.
+    # A SOURCE check, kept but demoted. It is the weaker kind and must not read
+    # as proof -- and it has to be precise: an earlier version matched
+    # `.resolve(` and went green on `Path(__file__).resolve()` two lines into
+    # the imports, which is the wrapped-phrase grep failure in another costume.
     src = (Path(__file__).resolve().parent.parent / "app" / "main.py").read_text()
     wired = re.search(r"\b(eng|engine)\.resolve\(", src) is not None
-    after_adj = src.split("act 4")[-1][:800]
-    gated = bool(re.search(r"if\s+v\.resolution|resolution\s*==|verdict\s*==", after_adj))
-    print("\nIs the verdict load-bearing in the demo?  (source check, not behavioural)")
+    # NOT "gated on the resolution" -- that was the previous design and it is
+    # exactly what must not be true now. The cascade must hang off the external
+    # event, and the retraction must not carry the model's verdict.
+    gated = "EXTERNAL_RETRACTION" in src and "if event is None:" in src
+    uncoupled = not re.search(r"put\(type=\"retracting\"[^)]*(resolution|authorised_by)", src, re.S)
+    print("\nSource check (weak, kept for signal only)")
     print(f"  {'PASS' if wired else 'FAIL'}  app/main.py calls engine.resolve()")
-    print(f"  {'PASS' if gated else 'FAIL'}  the cascade is gated on the verdict")
-    if not (wired and gated):
-        print("\n  app/main.py asks for a verdict, prints it, and retracts")
-        print("  unconditionally on the next statement. Invert Claude's answer and")
-        print("  the product behaves identically. A verdict that does not change")
-        print("  the outcome is a verdict on a screen.")
+    print(f"  {'PASS' if gated else 'FAIL'}  the cascade hangs off the external event")
+    print(f"  {'PASS' if uncoupled else 'FAIL'}  the retraction event does not carry the verdict")
+    if not (wired and gated and uncoupled):
         failures += 1
 
+    failures += behavioural()
     return 1 if failures else 0
+
+
+def behavioural() -> int:
+    """The 3x2 matrix: every verdict, with the external retraction event absent
+    and present.
+
+    The point is that these are two independent inputs. An earlier version of
+    this arm tested only the verdict and passed a build in which `superseded`
+    triggered the cascade -- which is the model authorising compensation one step
+    removed. A matrix is what makes the independence observable rather than
+    asserted:
+
+      event ABSENT   no retraction and no compensation, on ALL THREE verdicts.
+                     The model deciding a belief is wrong does not entitle it to
+                     move money.
+      event PRESENT  the cascade runs on ALL THREE verdicts, on the event's own
+                     authority and receipt. The resolution is not consulted.
+      either way     the verdict still changes what the memory believes --
+                     `superseded` closes the incumbent and writes the challenger,
+                     the other two do not.
+
+    `_story_events` is a plain function pushing dicts onto a queue, so it runs
+    directly with the adjudicator and the external-event seam stubbed. No HTTP,
+    no stream parsing, and no reimplementation of the logic under test.
+    """
+    import queue
+    import app.main as M
+
+    class Stub:
+        is_model = False
+        name = "stub"
+
+        def __init__(self, resolution): self.resolution = resolution
+
+        def judge(self, *a, **k):
+            from retract.adjudicate import Verdict
+            return Verdict(self.resolution, 1.0, "stubbed for the eval", self.name)
+
+    original, original_emb = M._adjudicator, M._embedder
+    original_event = M.EXTERNAL_RETRACTION
+    if M._embedder is None:
+        M._embedder = get_embedder(os.environ.get("RETRACT_EMBEDDER", "bedrock"))
+
+    print("\nBehavioural 3x2: verdict x external retraction event")
+    print("  the two axes must be independent, or the model is authorising money\n")
+    bad = 0
+    try:
+        for verdict in ("rejected", "duplicate", "superseded"):
+            for present in (False, True):
+                M._adjudicator = Stub(verdict)
+                M.EXTERNAL_RETRACTION = original_event if present else (lambda scope: None)
+
+                q: "queue.Queue[dict]" = queue.Queue()
+                M._story_events(q)
+                events = []
+                while not q.empty():
+                    events.append(q.get())
+                scope = next(e["scope"] for e in events if e["type"] == "done")
+                st = state(os.environ["CRDB_URL"], scope)
+                cascade = any(e["type"] == "retracting" for e in events)
+                retracting = next((e for e in events if e["type"] == "retracting"), {})
+
+                problems = []
+                if present:
+                    if not cascade:            problems.append("no cascade")
+                    if st["retracted"] == 0:   problems.append("nothing retracted")
+                    if st["effects_touched"] == 0: problems.append("no effect touched")
+                    # The event must be recorded by ITS authority, not the model's.
+                    if retracting.get("authority") != "fraud-team":
+                        problems.append("retraction not attributed to the external authority")
+                    if not retracting.get("receipt"):
+                        problems.append("retraction carries no receipt")
+                    if "resolution" in retracting or "authorised_by" in retracting:
+                        problems.append("retraction event carries the model's resolution")
+                else:
+                    if cascade:                problems.append("cascade ran with no external event")
+                    if st["retracted"]:        problems.append(f"{st['retracted']} retracted with no event")
+                    if st["effects_touched"]:  problems.append(f"{st['effects_touched']} effects touched with no event")
+
+                # The verdict axis, which must hold on BOTH sides of the matrix.
+                # Measured as ROWS, not as the incumbent's status: resolve()
+                # writes the challenger, and a later cascade overwrites the
+                # incumbent's status from 'superseded' to 'retracted' -- the
+                # first draft asserted the status and failed a correct build.
+                # The extra row is what the verdict durably did.
+                want_rows = 6 if verdict == "superseded" else 5
+                if st["rows"] != want_rows:
+                    problems.append(f"memory rows={st['rows']}, expected {want_rows} "
+                                    f"-- the verdict did not change what is believed")
+                if st["open_contradictions"]:
+                    problems.append(f"{st['open_contradictions']} contradiction left OPEN")
+
+                bad += bool(problems)
+                tag = "event" if present else "no event"
+                print(f"  {'PASS' if not problems else 'FAIL'}  {verdict:<11} {tag:<9} "
+                      f"retracted={st['retracted']} effects={st['effects_touched']} "
+                      f"rows={st['rows']} cascade={'yes' if cascade else 'no'}")
+                for pr in problems:
+                    print(f"          {pr}")
+    finally:
+        M._adjudicator, M._embedder = original, original_emb
+        M.EXTERNAL_RETRACTION = original_event
+
+    if bad:
+        print("\n  The model's verdict and the authority to take money back are not"
+              "\n  separated. That is the defect, whichever cell failed.")
+    return bad
 
 
 if __name__ == "__main__":
