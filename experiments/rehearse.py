@@ -97,7 +97,80 @@ def redact(url: str) -> str:
     return re.sub(r"([?&]token=)[^&]*", r"\1REDACTED", url)
 
 
-def rehearse(page, out: dict) -> None:
+class Pointer:
+    """Records where each action landed, in video-frame coordinates.
+
+    WHY THIS EXISTS
+    Playwright composites the page and not the pointer, so no frame in any
+    rehearsal contains a cursor. That is the largest single gap between this
+    output and a Screen Studio-class recording: in post you cannot draw a cursor
+    you have no position for, and you cannot centre a zoom on a click you have to
+    guess at. This track is the missing input for both.
+
+    IT OBSERVES, IT DOES NOT DRIVE. Every position is read from the element the
+    script was already going to act on, at the moment it was already going to act.
+    No hold is shortened, no click is moved, no step is added or reordered -- the
+    timings in DEMO.md exist so the DOM settles, and a video harness that edits
+    them is editing the run rather than the recording.
+
+    HONEST LIMITS, because a timeline that claims more precision than it has is
+    worse than none:
+      - `t_ms` is measured from the moment the page object is created, which is
+        as close to the video's first frame as Playwright exposes. It is not
+        frame-exact; expect tens of milliseconds of offset, in one direction for
+        the whole track. Calibrate once against a visible transition rather than
+        trusting it absolutely.
+      - Reading a bounding box costs one CDP round-trip that the run did not
+        previously make. Measured cost is reported per run as `probe_ms` so it
+        can be compared against the run-to-run spread instead of assumed to be
+        free.
+      - Coordinates are viewport-relative, which equals frame-relative only
+        because the recording size and the viewport are both 1440x900. If those
+        are ever set differently, this mapping is wrong and silently so.
+    """
+
+    def __init__(self) -> None:
+        self.marks: list[dict] = []
+        self._t0: float | None = None
+        self.probe_ms = 0.0
+
+    def start(self) -> None:
+        """Call immediately after the page is created -- video t0."""
+        self._t0 = time.monotonic()
+
+    def _stamp(self, kind: str, target: str, box: dict | None) -> None:
+        if self._t0 is None or box is None:
+            return
+        self.marks.append({
+            "t_ms": round((time.monotonic() - self._t0) * 1000),
+            # Playwright acts on the element's centre unless told otherwise, so
+            # the centre is the true pointer position, not the box origin.
+            "x": round(box["x"] + box["width"] / 2),
+            "y": round(box["y"] + box["height"] / 2),
+            "kind": kind,
+            "target": target,
+        })
+
+    def _box(self, locator):
+        t = time.monotonic()
+        box = locator.bounding_box()
+        self.probe_ms += (time.monotonic() - t) * 1000
+        return box
+
+    def scroll(self, page, selector: str) -> None:
+        loc = page.locator(selector)
+        loc.scroll_into_view_if_needed()
+        # After the scroll, not before: the box is what the frame will show.
+        self._stamp("scroll", selector, self._box(loc))
+
+    def click(self, page, selector: str) -> None:
+        loc = page.locator(selector)
+        # Before the click, because the click is what changes the page.
+        self._stamp("click", selector, self._box(loc))
+        loc.click()
+
+
+def rehearse(page, out: dict, ptr: "Pointer | None" = None) -> None:
     """One full pass: warm, reveal, race, story. Mirrors DEMO.md's order."""
     page.goto(URL, wait_until="domcontentloaded")
 
@@ -118,17 +191,17 @@ def rehearse(page, out: dict) -> None:
     page.wait_for_selector("#reveal", timeout=30_000)
 
     # 0:18 -- the reveal. No write path, so no token involved.
-    page.locator("#reveal").scroll_into_view_if_needed()
+    ptr.scroll(page, "#reveal")
     t = time.monotonic()
-    page.click("#reveal")
+    ptr.click(page, "#reveal")
     page.wait_for_timeout(1500)
     out["reveal_s"] = round(time.monotonic() - t, 2)
 
     # 0:36 -- both races, live. Waits on the button re-enabling rather than a
     # fixed sleep: the whole point of the beat is that the two panes differ.
-    page.locator("#run").scroll_into_view_if_needed()
+    ptr.scroll(page, "#run")
     t = time.monotonic()
-    page.click("#run")
+    ptr.click(page, "#run")
     page.wait_for_function(
         "() => !document.querySelector('#run').disabled", timeout=120_000
     )
@@ -146,9 +219,9 @@ def rehearse(page, out: dict) -> None:
     # with `done`, and an unqualified check is satisfied by one of those the
     # instant the click lands -- which reports a 0.02s story and records no act
     # 5 at all.
-    page.locator("#tell").scroll_into_view_if_needed()
+    ptr.scroll(page, "#tell")
     t = time.monotonic()
-    page.click("#tell")
+    ptr.click(page, "#tell")
     page.wait_for_function(
         "() => (window.__marks || []).some("
         "m => m.type === 'done' && m.stream.endsWith('/story'))",
@@ -160,7 +233,7 @@ def rehearse(page, out: dict) -> None:
     # scrolls records act 5 happening off screen -- which is what the first pass
     # of this script did. DEMO.md's shot list does not mention a scroll; the real
     # take needs one here too.
-    page.locator("#fx").scroll_into_view_if_needed()
+    ptr.scroll(page, "#fx")
     page.wait_for_timeout(2500)  # let the effects table settle before the cut
     out["effects_table"] = page.text_content("#fx")
     out["punch"] = page.text_content("#punch")
@@ -227,6 +300,11 @@ def main() -> int:
             )
             ctx.add_init_script(PROBE)
             page = ctx.new_page()
+            # Start the pointer clock as close to the video's first frame as
+            # Playwright lets us stand: the page object is what the recorder
+            # attaches to.
+            ptr = Pointer()
+            ptr.start()
             page.on("console", lambda m: m.type == "error"
                     and hiccups.append({"kind": "console", "text": m.text}))
             # A completed EventSource is closed by the page, which Chromium
@@ -242,10 +320,12 @@ def main() -> int:
 
             run: dict = {"n": i + 1, "hiccups": hiccups}
             try:
-                rehearse(page, run)
+                rehearse(page, run, ptr)
                 run["act5"] = act_five(run.get("marks", []))
             except Exception as exc:  # noqa: BLE001 - a failed pass is a result
                 run["error"] = f"{type(exc).__name__}: {exc}"
+            run["pointer"] = ptr.marks
+            run["pointer_probe_ms"] = round(ptr.probe_ms, 1)
             video = page.video
             ctx.close()  # the video is only finalised on close
             if video:
@@ -259,6 +339,20 @@ def main() -> int:
 
     path = outdir / "rehearsal.json"
     path.write_text(json.dumps(report, indent=2))
+
+    # One pointer track per run, named after its video, because the pair is what
+    # post needs and a track without its footage is not usable.
+    for run in report["runs"]:
+        if not run.get("pointer") or not run.get("video"):
+            continue
+        track = pathlib.Path(run["video"]).with_suffix(".pointer.json")
+        track.write_text(json.dumps({
+            "video": run["video"],
+            "frame": VIEWPORT,
+            "t0": "page creation; not frame-exact -- calibrate once against a visible transition",
+            "marks": run["pointer"],
+        }, indent=2))
+        run["pointer_track"] = str(track)
 
     print("\n=== REHEARSAL (not the take) ===")
     for run in report["runs"]:
@@ -289,6 +383,9 @@ def main() -> int:
             print(f"               {h}")
         if run.get("video"):
             print(f"  video        {run['video']}")
+        if run.get("pointer"):
+            print(f"  pointer      {len(run['pointer'])} marks, "
+                  f"{run['pointer_probe_ms']}ms of probes across the run")
     print(f"\nreport  {path}")
     return 0
 
