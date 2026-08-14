@@ -17,6 +17,26 @@ actually used: -c for a statement, -f for a file.
 Rows print tab-separated with no header, matching the `psql -tAc` form the
 script's callers already parse. Exit status is 0 on success, 1 on a database
 error, so `run` in verify_live.sh keeps working unchanged.
+
+WHY EXIT STATUS ALONE WAS NOT ENOUGH
+`run` in verify_live.sh grades a step by its exit status, and this file
+originally exited 0 whenever the statements executed -- with no assertion about
+what came back. A SELECT that matches nothing executes perfectly. That made two
+of the eleven checks incapable of failing on a wrong answer:
+
+  step 2  "compensated_by column exists"        passes if the column does not
+  step 6  "reversal rows exist and are distinct"  passes against an empty ledger
+
+Step 6 is the one the script's own comment calls the whole Day-2 claim, and it
+returned PASS when that claim was false. Verified rather than reasoned: a query
+for a column that does not exist, and a query for an idempotency key that was
+never written, both exited 0 before this change.
+
+--expect-rows N and --min-rows N close that. A check whose failure mode is
+"returns nothing" needs a row count, or it is testing that the network is up.
+
+    crdb.py -c "SELECT ..." --expect-rows 1   # exactly one row, or exit 1
+    crdb.py -c "SELECT ..." --min-rows 1      # at least one row, or exit 1
 """
 
 import os
@@ -40,8 +60,26 @@ def statements(sql: str) -> list[str]:
 
 
 def main() -> int:
-    if len(sys.argv) < 3 or sys.argv[1] not in ("-c", "-f"):
-        print("usage: crdb.py -c <statement> | -f <file>", file=sys.stderr)
+    args = sys.argv[1:]
+    expect_rows: int | None = None
+    min_rows: int | None = None
+    for flag in ("--expect-rows", "--min-rows"):
+        if flag in args:
+            i = args.index(flag)
+            try:
+                value = int(args[i + 1])
+            except (IndexError, ValueError):
+                print(f"{flag} needs an integer", file=sys.stderr)
+                return 2
+            if flag == "--expect-rows":
+                expect_rows = value
+            else:
+                min_rows = value
+            del args[i:i + 2]
+
+    if len(args) < 2 or args[0] not in ("-c", "-f"):
+        print("usage: crdb.py -c <statement> | -f <file> "
+              "[--expect-rows N] [--min-rows N]", file=sys.stderr)
         return 2
 
     url = os.environ.get("CRDB_URL")
@@ -49,8 +87,13 @@ def main() -> int:
         print("CRDB_URL is unset", file=sys.stderr)
         return 1
 
-    flag, arg = sys.argv[1], sys.argv[2]
+    flag, arg = args[0], args[1]
     sql = open(arg).read() if flag == "-f" else arg
+
+    # Counted across every statement that returned a result set, so a caller
+    # passing one SELECT gets exactly what it expects and a caller passing a
+    # file gets the total. Assertions are for the one-statement form.
+    returned = 0
 
     # Autocommit: DDL in CockroachDB is transactional but a failed statement
     # inside an explicit transaction poisons every statement after it, which
@@ -64,8 +107,19 @@ def main() -> int:
                 print(f"{type(exc).__name__}: {exc}", file=sys.stderr)
                 return 1
             if cur.description is not None:
-                for row in cur.fetchall():
+                rows = cur.fetchall()
+                returned += len(rows)
+                for row in rows:
                     print("\t".join("" if v is None else str(v) for v in row))
+
+    if expect_rows is not None and returned != expect_rows:
+        print(f"expected exactly {expect_rows} row(s), got {returned}",
+              file=sys.stderr)
+        return 1
+    if min_rows is not None and returned < min_rows:
+        print(f"expected at least {min_rows} row(s), got {returned}",
+              file=sys.stderr)
+        return 1
     return 0
 
 

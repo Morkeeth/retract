@@ -81,7 +81,10 @@ if [ "${APPLY_SCHEMA:-0}" = "1" ]; then
 else
   meh "not applied. Re-run with APPLY_SCHEMA=1, or: uv run python experiments/crdb.py -f schema_v3.sql"
 fi
-run "compensated_by column exists" uv run python experiments/crdb.py -c \
+# --expect-rows 1 is what makes this a check. Without it the step passed when
+# the column was absent: information_schema returns nothing, the query executes
+# fine, and exit status says nothing about the answer.
+run "compensated_by column exists" uv run python experiments/crdb.py --expect-rows 1 -c \
   "SELECT column_name FROM information_schema.columns
     WHERE table_name='effect' AND column_name='compensated_by';"
 
@@ -100,13 +103,30 @@ run "scope_eval (6 attacks, control arm)" uv run python experiments/scope_eval.p
 
 step "6. The ledger claim, read back from the live cluster"
 # The Day-2 check in PLAN.md is 'a real reversal lands in the ledger with its
-# own id'. This is that sentence as SQL. A reversal that shares the original's
-# idempotency key would be a replay, not a reversal -- hence both columns.
-run "reversal rows exist and are distinct" uv run python experiments/crdb.py -c \
-  "SELECT e.id, e.tool, e.idempotency_key, e.status, e.compensated_by
-     FROM effect e WHERE e.compensated_by IS NOT NULL
-       OR e.idempotency_key LIKE 'comp:%'
-     ORDER BY e.created_at DESC LIMIT 10;"
+# own id'. This is that sentence as SQL.
+#
+# The previous form listed anything with a compensated_by or a `comp:` key and
+# exited 0 whatever came back -- including nothing at all. It printed the right
+# rows on a cluster that had them and passed identically on one that did not,
+# which is the definition of a check that is not one.
+#
+# This form returns a row only when the whole claim holds, so an empty result
+# is a failure rather than a quiet pass:
+#   - the original is `compensated` and points at a reversal that exists
+#   - the reversal executed
+#   - the two idempotency keys DIFFER: sharing one would make it a replay of
+#     the original effect, not a reversal of it
+#   - the reversal's key is derived as `comp:<original>`, which is the UNIQUE
+#     constraint doing the exactly-once work
+run "reversal rows exist and are distinct" uv run python experiments/crdb.py --min-rows 1 -c \
+  "SELECT orig.id, orig.idempotency_key, orig.status,
+          rev.id,  rev.idempotency_key,  rev.status
+     FROM effect orig JOIN effect rev ON orig.compensated_by = rev.id
+    WHERE orig.status = 'compensated'
+      AND rev.status  = 'executed'
+      AND rev.idempotency_key <> orig.idempotency_key
+      AND rev.idempotency_key = 'comp:' || orig.idempotency_key
+    ORDER BY rev.created_at DESC LIMIT 10;"
 
 printf '\n\033[1m%d passed · %d failed · %d skipped\033[0m\n' "$pass" "$fail" "$skip"
 if [ "$fail" -gt 0 ]; then
