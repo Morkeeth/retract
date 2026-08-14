@@ -332,10 +332,27 @@ async def contradictions(grant_token: str = ""):
         return {"available": False, "reason": f"MCP not configured: {e}",
                 "open": None, "via": "none"}
 
-    rows = await asyncio.to_thread(
-        lambda: GovernedMemoryReader(client, grant).open_contradictions())
+    # A RECEIPT, not a list of open contradictions.
+    #
+    # This endpoint used to return `open_contradictions()`, and that only ever
+    # produced rows because the story left its contradiction open -- the
+    # adjudicator's verdict was shown and never applied. Wiring resolve() closed
+    # it, and the feed went to zero: the product succeeded and the governed read
+    # path returned nothing, in the same frame. A read that is empty exactly when
+    # the product works is a badge, not a dependency.
+    #
+    # Failing closed matters as much as the shape. If MCP cannot serve this, the
+    # page shows the failure. It does not fall back to SQL and it does not
+    # quietly render without it -- a dependency that degrades silently to nothing
+    # was never a dependency, which is the whole of the finding this replaces.
+    try:
+        receipt = await asyncio.to_thread(
+            lambda: GovernedMemoryReader(client, grant).session_receipt())
+    except MCPError as e:
+        return {"available": False, "reason": f"MCP read failed: {e}",
+                "receipt": None, "via": "cockroachdb-managed-mcp"}
     return {"available": True, "via": "cockroachdb-managed-mcp",
-            "scope": grant.scope, "open": len(rows), "contradictions": rows}
+            "scope": grant.scope, "receipt": receipt}
 
 
 def _mcp_client():
@@ -491,7 +508,12 @@ def _story_events(q: "queue.Queue[dict]") -> None:
         # Close the contradiction under the same claim lock, whatever the answer.
         # Leaving it open is how the MCP feed could show an open contradiction
         # seconds after this page said it had been adjudicated.
-        eng.resolve(res.contradiction_id, v.resolution, E(neg))
+        eng.resolve(res.contradiction_id, v.resolution, E(neg), metadata={
+            "by": v.by,
+            "is_model": _adjudicator.is_model,
+            "confidence": v.confidence,
+            "reasoning": v.reasoning,
+        })
         put(type="resolved", resolution=v.resolution,
             contradiction=str(res.contradiction_id))
         time.sleep(0.5)

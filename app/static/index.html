@@ -311,7 +311,7 @@
     <div class="feed" id="feed">
       <div class="feedhead">
         <span class="feednum" id="feednum">&mdash;</span>
-        <span class="feedlabel" id="feedlabel">run 03 to open one</span>
+        <span class="feedlabel" id="feedlabel">run 03 to produce one</span>
       </div>
       <div id="feedrows"></div>
       <div class="feedvia mono" id="feedvia"></div>
@@ -361,27 +361,49 @@ fetch('/api/health').then(r=>r.json()).then(h=>{
 // non-zero number would be a graphic, not an instrument.
 function loadFeed(token){
   const box=$('#feed');
+  // FAIL CLOSED. If the receipt cannot be served, the story says so rather than
+  // rendering as if the read had never been part of it.
   if(!token){ $('#feedlabel').textContent='no session grant returned'; return; }
   fetch('/api/contradictions?grant_token='+encodeURIComponent(token))
     .then(r=>r.json()).then(f=>{
-      if(!f.available){
+      if(!f.available || !f.receipt){
         box.classList.add('unavailable');
         $('#feednum').textContent='—';
-        $('#feedlabel').textContent='not available';
-        $('#feedvia').textContent=f.reason||'';
+        $('#feedlabel').textContent='session receipt unavailable — this story is unverified';
+        $('#feedvia').textContent=(f.reason||'')+' · no SQL fallback: the receipt is served through MCP or not at all';
         return;
       }
+      const R=f.receipt, c=(R.contradictions||[])[0]||null;
+      const owed=(R.effects||[]).filter(e=>e.status==='needs_compensation');
+      const req=(R.effects||[]).filter(e=>String(e.tool||'').endsWith('_requested'));
+      const dispatched=req.filter(e=>e.external_receipt);
       box.classList.remove('unavailable');
-      $('#feednum').textContent=f.open;
-      $('#feedlabel').textContent=f.open===1?'open contradiction in this session'
-                                            :'open contradictions in this session';
-      $('#feedrows').innerHTML=(f.contradictions||[]).map(c=>
-        `<div class="feedrow"><span class="subj">${c.subject} · ${c.predicate}</span>
-         <span class="chal">challenged by ${c.challenger_by} at L2 ${c.distance} — ${c.challenger}</span></div>`
-      ).join('');
-      $('#feedvia').textContent='read through '+f.via+' · scope '+f.scope+' · this endpoint cannot write';
+      $('#feednum').textContent=owed.length;
+      $('#feedlabel').textContent=owed.length===1?'effect still owed a reversal'
+                                                 :'effects still owed a reversal';
+      const rows=[];
+      if(c) rows.push(`<div class="feedrow"><span class="subj">${c.subject} · ${c.predicate}</span>
+        <span class="chal">challenged at L2 ${c.distance} by ${c.challenger_by} — resolved <b>${c.resolution}</b></span></div>`);
+      const A=R.adjudication;
+      if(A) rows.push(`<div class="feedrow"><span class="subj">adjudicated by ${A.by}</span>
+        <span class="chal">${A.is_model?'a model':'a stand-in, not a model'} · confidence ${A.confidence} · read from audit_log, not from this page — ${A.reasoning}</span></div>`);
+      rows.push(`<div class="feedrow"><span class="subj">memory</span><span class="chal">${
+        (R.memory||[]).map(m=>m.n+' '+m.status).join(' · ')||'—'}</span></div>`);
+      owed.forEach(e=>rows.push(`<div class="feedrow"><span class="subj">${e.tool}</span>
+        <span class="chal">owed a reversal · justified by “${e.justified_by}”</span></div>`));
+      req.forEach(e=>rows.push(`<div class="feedrow"><span class="subj">${e.tool}</span>
+        <span class="chal">${e.external_receipt?('dispatched · receipt '+e.external_receipt)
+          :'recorded under '+e.idempotency_key+' · not dispatched, no provider configured'}</span></div>`));
+      $('#feedrows').innerHTML=rows.join('');
+      $('#feedvia').textContent='read through '+f.via+' · scope '+f.scope+' · '+
+        (R.audit||[]).length+' audit entries · this endpoint cannot write · '+
+        dispatched.length+' of '+req.length+' reversal requests dispatched';
     })
-    .catch(e=>{ $('#feedlabel').textContent='feed unreachable'; $('#feedvia').textContent=String(e); });
+    .catch(e=>{
+      box.classList.add('unavailable');
+      $('#feedlabel').textContent='session receipt unreachable — this story is unverified';
+      $('#feedvia').textContent=String(e);
+    });
 }
 
 // ---- the ruler -----------------------------------------------------------

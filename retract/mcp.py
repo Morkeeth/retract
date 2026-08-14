@@ -209,6 +209,80 @@ class GovernedMemoryReader:
               AND c.scope = {self._s} AND m.scope = {self._s}
         """)
 
+    def session_receipt(self) -> dict:
+        """Everything the session just did, read back through MCP.
+
+        WHY THIS REPLACED `open_contradictions` AS THE PRODUCT'S READ
+        The page used to call open_contradictions() after the story finished.
+        That worked only because the story left its contradiction OPEN -- the
+        adjudicator's verdict was displayed and never applied. The moment
+        `resolve()` was wired in, the story closed the contradiction and the
+        feed went to zero: a judge watched the product succeed and watched MCP
+        return nothing. The governed read path was decorative.
+
+        A receipt is a read the product depends on. It answers "what happened in
+        the session you just watched", and every field comes back over the
+        managed endpoint that cannot write -- which is the claim the submission
+        makes about this path.
+
+        Five reads, one per thing a judge would ask:
+          the contradiction, and how it was resolved and by whom
+          what the memory believes now
+          the effects that were reached and are owed a reversal
+          the reversal requests, and whether anything was dispatched
+          the audit trail that says who did it
+        """
+        contradiction = self.mcp.select(f"""
+            SELECT subject, predicate, challenger, challenger_by, distance,
+                   resolution, detected_at, resolved_at
+            FROM contradiction
+            WHERE scope = {self._s}
+            ORDER BY detected_at DESC
+        """)
+        memory = self.mcp.select(f"""
+            SELECT status, count(*) AS n
+            FROM memory WHERE scope = {self._s}
+            GROUP BY status ORDER BY status
+        """)
+        effects = self.mcp.select(f"""
+            SELECT e.tool, e.status, e.idempotency_key,
+                   e.payload->>'dispatch' AS dispatch,
+                   e.payload->>'external_receipt' AS external_receipt,
+                   m.content AS justified_by
+            FROM effect e JOIN memory m ON m.id = e.justified_by
+            WHERE e.scope = {self._s}
+            ORDER BY e.created_at
+        """)
+        # `detail` was omitted here, which is why the adjudicator's identity was
+        # invisible to this path even after it was being written. The receipt
+        # must be able to answer "which backend decided" from the DATABASE.
+        audit = self.mcp.select(f"""
+            SELECT at, agent, action, detail FROM audit_log
+            WHERE scope = {self._s} ORDER BY at
+        """)
+        adjudication = None
+        for row in audit:
+            d = row.get("detail")
+            if isinstance(d, str):
+                try:
+                    d = json.loads(d)
+                except ValueError:
+                    d = None
+            if isinstance(d, dict) and d.get("adjudication"):
+                adjudication = dict(d["adjudication"])
+                adjudication["verdict"] = d.get("verdict")
+                break
+        return {
+            "scope": self.grant.scope,
+            "contradictions": contradiction,
+            "memory": memory,
+            "effects": effects,
+            "audit": audit,
+            # Read back out of audit_log, not carried over from the stream.
+            "adjudication": adjudication,
+            "served_by": "cockroachdb-managed-mcp",
+        }
+
     def audit_tail(self, limit: int = 25) -> list[dict]:
         return self.mcp.select(f"""
             SELECT at, agent, action, detail

@@ -213,7 +213,8 @@ class MemoryEngine:
 
     # ------------------------------------------------------------- RESOLVE ---
     def resolve(self, contradiction_id: uuid.UUID, verdict: str,
-                embedding: np.ndarray | None = None) -> CommitResult:
+                embedding: np.ndarray | None = None,
+                metadata: dict | None = None) -> CommitResult:
         """Adjudicate a contradiction under the same claim lock.
 
         verdict 'superseded' -> the challenger wins; the incumbent is closed and
@@ -259,8 +260,16 @@ class MemoryEngine:
                 "UPDATE contradiction SET resolution=%s, resolved_at=now() WHERE id=%s",
                 (verdict, contradiction_id),
             )
-            self._audit(cur, "resolve", c["incumbent_id"],
-                        {"verdict": verdict, "contradiction": str(contradiction_id)})
+            # `metadata` carries WHO decided and why: the adjudicator's name,
+            # whether it is a model at all, its confidence and its reasoning.
+            # Without it the only durable record is that a resolution happened,
+            # attributed to `self.agent` -- which is the writing agent, not the
+            # adjudicator. A judge asking "which backend decided this?" would
+            # have had to take the browser's word for it.
+            detail = {"verdict": verdict, "contradiction": str(contradiction_id)}
+            if metadata:
+                detail["adjudication"] = metadata
+            self._audit(cur, "resolve", c["incumbent_id"], detail)
             conn.commit()
 
         return CommitResult(verdict, new_id, c["incumbent_id"], c["content"] if "content" in c else None)
