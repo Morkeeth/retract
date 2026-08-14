@@ -63,12 +63,18 @@ exactly one agent holds a given claim key inside the commit transaction at a
 time (a lock row taken with durable locking enabled so a lease transfer cannot
 drop it), and that the outcome is recorded atomically with the memory and the
 side effects it touches. It does not guarantee the adjudication is correct — a
-model does that, and the page says so. As of **14 Aug 2026** the live
-adjudicator is a labelled **heuristic stand-in**; the Claude adapter is wired
-and waiting on a one-time Anthropic use-case form. A stand-in must never be
-able to pass as the real thing. (This paragraph said "tonight" until 14 Aug,
-which was true when written and unreadable four days later — a claim about the
-present tense needs the date it was true.)
+model does that, and the page says so. As of **14 Aug 2026, 09:30 CEST** the
+live adjudicator is **Claude on Bedrock** — `/status` returns
+`"adjudicator": "bedrock:claude"` and `"adjudicator_is_model": true`. Until
+that morning it was a labelled heuristic stand-in, blocked on a one-time
+Anthropic use-case form; the form cleared and the next container restart picked
+the model up through the `auto` path. A stand-in must never be able to pass as
+the real thing, which is why the page prints whichever one is running rather
+than what this file hopes is running.
+
+Read the next section before treating that as good news: on
+`experiments/adjudicate_eval.py` the model scores **7/8**, the same score the
+stand-in got, on a different case.
 
 ---
 
@@ -105,15 +111,23 @@ Everything else is identical. Do not point `RETRACT_EMBEDDER=local` at a
 512-dim schema: MiniLM is 384-dim and the engine will refuse the write rather
 than pad.
 
-`RETRACT_ADJUDICATOR=bedrock` does **not** currently give you Claude, and this
-sentence used to say it did. On this account Bedrock answers a Converse call to
-`us.anthropic.claude-sonnet-4-5-20250929-v1:0` with *"Model use case details
-have not been submitted for this account"* (probed 14 Aug, us-east-1). Unlike
-the embedder, the explicit adjudicator path does not warm up or fall back — it
-constructs a client happily and then raises on the first real adjudication. The
-one-time Anthropic use-case form in the Bedrock console is the whole of what is
-missing. Until it clears, leave `RETRACT_ADJUDICATOR` unset or `heuristic`,
-which is what the deployed demo runs and labels.
+`RETRACT_ADJUDICATOR=bedrock` gives you Claude, as of 14 Aug. Before that
+morning it did not, and this paragraph said so; the blocker was the one-time
+Anthropic use-case form on the AWS account, not the code. Two things are worth
+keeping from that history:
+
+- The **default model id is pinned for a reason**. The host IAM user is scoped
+  to specific model ARNs, so `us.anthropic.claude-sonnet-4-5-20250929-v1:0`
+  works and a newer id does not — a Converse call to
+  `us.anthropic.claude-sonnet-4-6` with that credential returns
+  `AccessDeniedException ... not authorized to perform: bedrock:InvokeModel`
+  (probed 14 Aug, us-east-1). Changing `RETRACT_ADJUDICATOR_MODEL` means
+  widening the IAM policy too, or the demo fails closed at the first
+  contradiction.
+- The explicit `bedrock` path does **not** warm up or fall back the way the
+  embedder's `auto` does. It constructs a client and raises on the first real
+  adjudication. `auto` probes at startup and degrades to the labelled stand-in,
+  which is how the deployed demo survived the days before access landed.
 
 ---
 
@@ -136,7 +150,7 @@ uv run python experiments/adjudicate_eval.py       # paraphrase vs contradiction
 | `race --mode naive` | **8** active beliefs, **8** distinct claim keys, 0 contradictions seen — same cluster, same table, same embeddings, no claim lock |
 | `race --mode retract` | **1** active belief, **1** claim key, 7 contradictions raised |
 | `cascade` | 8/8 — including *"9902 untouched"* and *"executed refund → needs_compensation"* |
-| `compensate_eval` | refund ends `compensated` with one reversal row; unregistered tool stays `needs_compensation`; unrelated customer untouched. **Unrun against the live Cloud cluster in the overnight environment** (no credentials); offline-verified against a local single-node store |
+| `compensate_eval` | refund ends `compensated` with one reversal row; unregistered tool stays `needs_compensation`; unrelated customer untouched. Run against the live Cloud cluster on 14 Aug with the real Titan embedder (step 3 of `experiments/verify_live.sh`); the no-handler control arm was also watched failing when a handler was patched in |
 | `day1_conflict` | NEAR 13% vs FAR 8%, p = 0.15 — **not significant**. We tested whether the explicit lock could be dropped in favour of the vector index. It cannot |
 
 ---
@@ -182,14 +196,14 @@ a reviewer can query a table and cannot query an engine feature.
 vector CockroachDB indexes. (Titan accepts 256/512/1024 and *rejects* 384, which
 forced a schema migration — measured, not assumed.)
 
-**Amazon Bedrock — Claude as the adjudicator: adapter wired, NOT running.**
-The state belongs in the bold line, because a sponsor-tech list is read by
-skimming and the correction two sentences down does not survive a skim. Claude
-has never adjudicated once on this account: the Anthropic use-case form has not
-been submitted, so `us.anthropic.claude-sonnet-4-5-20250929-v1:0` returns
-`ResourceNotFoundException`. The `us.` inference profile is required — the bare
-model id is not invocable on demand — and everything but the form is in place.
-The live demo prints the labelled heuristic stand-in.
+**Amazon Bedrock — Claude as the adjudicator: running since 14 Aug, scoring
+7/8.** The state belongs in the bold line, because a sponsor-tech list is read
+by skimming and a correction two sentences down does not survive a skim. It
+adjudicates every contradiction the live demo raises, via
+`us.anthropic.claude-sonnet-4-5-20250929-v1:0`; the `us.` inference profile is
+required, as the bare model id is not invocable on demand. It scores 7/8 on
+`experiments/adjudicate_eval.py` — not 8/8, which earlier drafts of this repo
+predicted it would — and the eval's exit code says so.
 
 Both sit behind interfaces (`retract/embed.py`, `retract/adjudicate.py`) so the
 whole project runs with no AWS account at all. The fallbacks are labelled

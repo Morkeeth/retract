@@ -64,23 +64,37 @@ required two.** The gate is satisfied by 1 and 2 without it.
 Titan alone satisfies this gate: every embedding in the live cluster came from
 it, and `/status` on the deployed URL names the model.
 
-    retract/adjudicate.py  Claude on Bedrock -- code path built, NOT running
+    retract/adjudicate.py  Claude on Bedrock -- running since 14 Aug, 09:30 CEST
 
-Say this plainly rather than let a judge find it. `RETRACT_ADJUDICATOR=auto`
-resolves to a heuristic stand-in today, because Bedrock answers a Converse call
-to `us.anthropic.claude-sonnet-4-5-20250929-v1:0` with `Model use case details
-have not been submitted for this account` (probed 14 Aug, us-east-1). The
-account has never submitted the Anthropic use-case form, so the model has never
-once adjudicated. Every surface says so in the same words: `/status` returns
-`"adjudicator": "heuristic (stand-in, not a model)"` and
-`"adjudicator_is_model": false`, and the page prints it beside the verdict.
+Both AWS services are live. `/status` on the deployed URL returns
+`"adjudicator": "bedrock:claude"` and `"adjudicator_is_model": true`, and the
+page prints whichever backend is running beside every verdict.
 
-The stand-in scores 7/8 on `experiments/adjudicate_eval.py`, failing the case
-that needs real reasoning -- "verified by passport" versus "verified by driving
-licence". If the form clears before submission, `RETRACT_ADJUDICATOR=bedrock`
-is the only change and the eval is re-run for the 8/8. If it does not clear,
-this paragraph is the submission's answer and nothing on any surface claims
-otherwise.
+This section said the opposite earlier the same morning, and the history is
+worth keeping rather than overwriting. Until the Anthropic use-case form on the
+AWS account cleared, a Converse call returned `Model use case details have not
+been submitted for this account` and the demo ran a labelled heuristic
+stand-in. The form was the entire blocker; no code changed. The `auto` path
+probes Bedrock at startup, so the next container restart picked the model up on
+its own.
+
+**And the honest part, which is not the good news.** Earlier drafts predicted
+Claude would score 8/8 on `experiments/adjudicate_eval.py`. It does not. Run
+against the real model on 14 Aug it scores **7/8** -- the same number the
+stand-in got, on a *different* case. It passes the one the stand-in failed
+("verified by passport" versus "verified by driving licence") and fails a case
+the stand-in passed: shown a generic claim and a more specific version of the
+same fact, it answers `superseded` where the eval expects `duplicate`. Its
+stated reasoning is that the more detailed claim should replace the generic
+one, which is a defensible reading -- the eval's expectation may be the thing
+that is wrong. Either way the eval exits 1 and nothing here claims 8/8.
+
+One further caveat on that 7/8, because the number is weaker than it looks:
+the eval's not-duplicate arm asserts only `resolution != "duplicate"`. All five
+not-duplicate cases came back `superseded`, so those five assertions confirm
+the model did not say "duplicate" and nothing more. A negation answered
+`superseded` rather than `rejected` would pass. The 7/8 is a real run of a real
+model and it is not a strong measurement of adjudication quality.
 
 The credential on the deploy host carries `bedrock:InvokeModel` on two model
 ARNs, and five escalation paths were probed and verified blocked.
