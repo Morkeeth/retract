@@ -78,4 +78,20 @@ scaffolding, and what is still open.
 - **Structured logs go to stdout as JSON.** Fields: request id, path, scenario,
   adjudication mode, lock outcome, cascade count, error class. Connection
   strings and raw prompts are never logged. Confirm the host's log drain does
-  not retain them longer than needed.
+  not retain them longer than needed. The `path` field is `request.url.path`,
+  which excludes the query string — see the entry below for why that mattered
+  and was not sufficient on its own.
+- **The demo token was written to the host's logs on every run — fixed as of
+  14 Aug.** This entry stays because the token that shipped before the fix has
+  to be treated as exposed. EventSource cannot set a header, so the token
+  travels as `?token=`, and uvicorn's own access logger prints the full request
+  line. The structured logger above was clean; it was simply not the only
+  logger. Probed against the deployed container with a canary value:
+
+      INFO: 100.64.0.3:60452 - "GET /api/run/story?token=CANARY-73baafb7 HTTP/1.1" 401
+
+  The container now starts with `--no-access-log` (Dockerfile), leaving the
+  structured logger as the only request record. **Rotate `DEMO_TOKEN` before
+  the demo URL is shared and again after any recording is published**: any
+  token used before this fix is in the host's retention, and a token that
+  appears in a video frame or a log line is spent.

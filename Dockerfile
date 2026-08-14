@@ -62,4 +62,19 @@ USER retract
 # Call the venv binary directly rather than going through `uv run`. uv wants a
 # writable cache on every invocation, which is pointless for an image whose
 # dependencies are already frozen in /app/.venv.
-CMD ["/app/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+#
+# --no-access-log is a security fix, not tidiness. EventSource cannot set a
+# header, so the demo token travels as `?token=` -- and uvicorn's access logger
+# prints the whole request line, query string included. Probed against the
+# deployed container on 14 Aug with a canary value:
+#
+#   INFO: 100.64.0.3:60452 - "GET /api/run/story?token=CANARY-73baafb7 HTTP/1.1" 401
+#
+# So every scenario run, including every run a judge makes and every take of
+# the video, wrote the live DEMO_TOKEN into Railway's log retention. Nothing is
+# lost by removing it: app/middleware.py already emits a structured line per
+# write path and per rejection, and it logs `request.url.path`, which excludes
+# the query string. That logger is the one SECURITY.md documents; this one was
+# shadowing it with an unredacted copy.
+CMD ["/app/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", \
+     "--no-access-log"]
