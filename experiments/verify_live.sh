@@ -57,6 +57,12 @@ export AWS_REGION="${AWS_REGION:-us-east-1}"
 # which is the answer this script exists to get.
 export RETRACT_EMBEDDER="${RETRACT_EMBEDDER:-bedrock}"
 
+
+record() { # record <true|false> -- one JSON line, appended, never rewritten
+  printf '{"at": "%s", "ok": %s, "suite": "verify_live"}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" >> "$(dirname "$0")/../.zup-testrun.json"
+}
+
 step "0. Credentials present"
 missing=()
 for v in CRDB_URL AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
@@ -131,11 +137,21 @@ run "reversal rows exist and are distinct" uv run python experiments/crdb.py --m
 printf '\n\033[1m%d passed · %d failed · %d skipped\033[0m\n' "$pass" "$fail" "$skip"
 if [ "$fail" -gt 0 ]; then
   echo "Do not merge #2 on this result."
+  record false
   exit 1
 fi
 if [ "${APPLY_SCHEMA:-0}" != "1" ]; then
   echo "Green, but the migration was skipped -- so step 3 ran against whatever"
   echo "schema was already live. Re-run with APPLY_SCHEMA=1 before merging."
+  record true
   exit 2
 fi
+record true
 echo "PR #2 verified against the live cluster. Merge is defensible."
+
+# A dated verdict, appended every run. Another lane reads this shape and can
+# say "passed 4d ago, before the last commit" rather than showing a stale green
+# as a current one -- which is the same disease as every other check on this
+# project that could not fail. Written on every exit path above too, via the
+# helper below, so a FAILING run records itself; a file that only ever gets
+# written on success is a success counter, not a test record.

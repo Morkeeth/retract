@@ -17,3 +17,7 @@ designs/
 # Rehearsal captures. experiments/rehearse.py writes video here; the footage is
 # a local artefact for timing the shot list, not something the repo carries.
 rehearsal/
+
+# Dated test verdicts, appended by experiments/verify_live.sh. Local state, not
+# repo content -- and it would add noise to the submission diff.
+.zup-testrun.json
