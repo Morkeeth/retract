@@ -243,7 +243,13 @@ Nothing else in this script changes.
 - [ ] **Address bar reads the Railway URL, not `localhost`** — and is in frame
 - [ ] Header shows a real cluster version, not `loading`
 - [ ] One warm-up run so the embedder is hot
-- [ ] Adjudicator line checked — stand-in for rehearsal, Claude for the final
+- [ ] Adjudicator line checked — **the final take shows the labelled heuristic
+      stand-in**, because that is what runs. This checkbox said "Claude for the
+      final" until 14 Aug, which would have directed the one artifact a judge
+      actually watches to show something that has never happened on this
+      account. Only if the Anthropic use-case form clears before the shoot does
+      the box read Claude, and then only after `RETRACT_ADJUDICATOR=bedrock` is
+      live and `adjudicate_eval.py` has been re-run
 - [ ] 1440 wide
 - [ ] Both buttons re-enabled (they disable while running)
 - [ ] **PR #2 merged and `verify_live.sh` green** — act 5 is already wired in

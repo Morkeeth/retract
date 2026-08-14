@@ -63,10 +63,12 @@ exactly one agent holds a given claim key inside the commit transaction at a
 time (a lock row taken with durable locking enabled so a lease transfer cannot
 drop it), and that the outcome is recorded atomically with the memory and the
 side effects it touches. It does not guarantee the adjudication is correct — a
-model does that, and the page says so. Tonight the live adjudicator is a
-labelled **heuristic stand-in**; the Claude adapter is wired and waiting on a
-one-time Anthropic use-case form. A stand-in must never be able to pass as the
-real thing.
+model does that, and the page says so. As of **14 Aug 2026** the live
+adjudicator is a labelled **heuristic stand-in**; the Claude adapter is wired
+and waiting on a one-time Anthropic use-case form. A stand-in must never be
+able to pass as the real thing. (This paragraph said "tonight" until 14 Aug,
+which was true when written and unreadable four days later — a claim about the
+present tense needs the date it was true.)
 
 ---
 
@@ -98,10 +100,20 @@ Open http://localhost:8117. Paste the demo token into the header field before
 clicking either write button. First load takes a few seconds while the embedder
 warms.
 
-With AWS configured, `RETRACT_EMBEDDER=bedrock RETRACT_ADJUDICATOR=bedrock` swaps
-in Titan embeddings and Claude adjudication. Everything else is identical. Do
-not point `RETRACT_EMBEDDER=local` at a 512-dim schema: MiniLM is 384-dim and
-the engine will refuse the write rather than pad.
+With AWS configured, `RETRACT_EMBEDDER=bedrock` swaps in Titan embeddings.
+Everything else is identical. Do not point `RETRACT_EMBEDDER=local` at a
+512-dim schema: MiniLM is 384-dim and the engine will refuse the write rather
+than pad.
+
+`RETRACT_ADJUDICATOR=bedrock` does **not** currently give you Claude, and this
+sentence used to say it did. On this account Bedrock answers a Converse call to
+`us.anthropic.claude-sonnet-4-5-20250929-v1:0` with *"Model use case details
+have not been submitted for this account"* (probed 14 Aug, us-east-1). Unlike
+the embedder, the explicit adjudicator path does not warm up or fall back — it
+constructs a client happily and then raises on the first real adjudication. The
+one-time Anthropic use-case form in the Bedrock console is the whole of what is
+missing. Until it clears, leave `RETRACT_ADJUDICATOR` unset or `heuristic`,
+which is what the deployed demo runs and labels.
 
 ---
 
@@ -170,10 +182,14 @@ a reviewer can query a table and cannot query an engine feature.
 vector CockroachDB indexes. (Titan accepts 256/512/1024 and *rejects* 384, which
 forced a schema migration — measured, not assumed.)
 
-**Amazon Bedrock — Claude** as the adjudicator, via the `us.` inference profile;
-the bare model id is not invocable on demand. The adapter is wired; the live
-demo currently prints the heuristic stand-in until the Anthropic use-case form
-lands.
+**Amazon Bedrock — Claude as the adjudicator: adapter wired, NOT running.**
+The state belongs in the bold line, because a sponsor-tech list is read by
+skimming and the correction two sentences down does not survive a skim. Claude
+has never adjudicated once on this account: the Anthropic use-case form has not
+been submitted, so `us.anthropic.claude-sonnet-4-5-20250929-v1:0` returns
+`ResourceNotFoundException`. The `us.` inference profile is required — the bare
+model id is not invocable on demand — and everything but the form is in place.
+The live demo prints the labelled heuristic stand-in.
 
 Both sit behind interfaces (`retract/embed.py`, `retract/adjudicate.py`) so the
 whole project runs with no AWS account at all. The fallbacks are labelled
