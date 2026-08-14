@@ -96,6 +96,41 @@ the model did not say "duplicate" and nothing more. A negation answered
 `superseded` rather than `rejected` would pass. The 7/8 is a real run of a real
 model and it is not a strong measurement of adjudication quality.
 
+### Open question: is the failing case a model error or an eval error?
+
+Left open on purpose. It could be closed by editing one line of
+`experiments/adjudicate_eval.py`, and editing it would make the number 8/8,
+which is the reason not to.
+
+The case: the incumbent is a generic claim and the challenger is the same fact
+with more detail. The eval expects `duplicate`. Claude answers `superseded`,
+reasoning that *"the challenger provides more specific information … making it
+a more detailed version that should replace the generic incumbent statement."*
+
+Both readings are coherent, and which one is right is a product decision this
+project has not made:
+
+- **`duplicate` is right** if a claim key holds *the fact*, and detail is a
+  property of the sentence rather than of the belief. Then the specific version
+  adds nothing to retract, and merging is correct.
+- **`superseded` is right** if the memory is meant to hold the best available
+  statement of a fact. Then replacing the vague version with the precise one is
+  the memory improving, and `superseded` records exactly that — with the
+  original still readable, because the schema is bitemporal and nothing is
+  destroyed.
+
+The consequence is not cosmetic. `superseded` closes the incumbent's
+`valid_to`, so any effect justified by it becomes reachable by a retraction of
+the newer belief. `duplicate` leaves the original standing and the challenger
+unwritten. Two different derivation graphs, and this project's entire argument
+is about what a retraction can reach through that graph.
+
+What can be said without deciding: the model's answer is defensible, the eval
+asserts one of the two readings without ever having argued for it, and the
+score is 7/8 either way. Deciding this properly needs the question put to
+someone who runs an agent fleet, not to whoever is holding the keyboard four
+days before a deadline.
+
 The credential on the deploy host carries `bedrock:InvokeModel` on two model
 ARNs, and five escalation paths were probed and verified blocked.
 

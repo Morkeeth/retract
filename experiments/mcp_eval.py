@@ -36,6 +36,32 @@ ATTACKS = [
 ]
 
 
+# The vocabulary the Cloud Managed MCP `select_query` validator uses when it
+# rejects a statement, observed verbatim against the live endpoint on 14 Aug:
+#
+#   only SELECT statements are allowed, got DELETE
+#   must contain exactly one statement
+#   CTE contains a non-SELECT statement: only SELECT statements are allowed
+#
+# Matching on the validator's own words is deliberately narrow. A broad match --
+# anything containing "select", say -- would re-admit the failure this exists to
+# close, because an auth error mentioning the tool name would slip through. If
+# the endpoint changes its wording this check goes red, which is the correct
+# outcome: the eval should stop claiming a refusal it can no longer recognise,
+# not guess.
+REFUSAL_MARKERS = (
+    "only select statements are allowed",
+    "must contain exactly one statement",
+    "cte contains a non-select statement",
+)
+
+
+def is_statement_refusal(err: MCPError) -> bool:
+    """True only when the endpoint refused the STATEMENT, not the caller."""
+    text = str(err).lower()
+    return any(marker in text for marker in REFUSAL_MARKERS)
+
+
 def main() -> int:
     try:
         mcp = MCPClient.from_env()
@@ -85,6 +111,7 @@ def main() -> int:
     # --- 2. can it write? It must not. -------------------------------------
     print("\nWRITE ATTEMPTS THROUGH THE READ TOOL (all must be refused):")
     refused = 0
+    misread: list[str] = []
     for label, stmt in ATTACKS:
         try:
             # Sent VERBATIM, bypassing MCPClient.select's whitespace normalisation.
@@ -96,12 +123,41 @@ def main() -> int:
                                       "database": "defaultdb", "query": stmt})
             print(f"  BREACH  {label}  -- statement was ACCEPTED")
         except MCPError as e:
-            refused += 1
-            print(f"  refused {label:<22} {str(e)[:60]}")
+            # `refused += 1` used to live here unconditionally, which made this a
+            # test of whether the call failed rather than of why. An expired
+            # service account, a wrong cluster id, a typo'd database name or a
+            # rate limit all raise MCPError, so nine infrastructure failures
+            # produced nine "refusals" and a PASS on a SECURITY claim -- the
+            # strongest claim in SECURITY.md, greened by the endpoint being
+            # unreachable. Only the statement validator's own vocabulary counts.
+            if is_statement_refusal(e):
+                refused += 1
+                print(f"  refused {label:<22} {str(e)[:60]}")
+            else:
+                misread.append(f"{label}: {e}")
+                print(f"  ERROR   {label:<22} not a refusal -- {str(e)[:60]}")
+
+    if misread:
+        print("\n  The run above proves nothing about the endpoint's validator.")
+        print("  These errors are the transport or the credential, not a refusal:")
+        for m in misread:
+            print(f"    {m[:110]}")
 
     # --- 3. did anything actually change? ----------------------------------
     after = reader.beliefs()
-    intact = len(after) == len(beliefs)
+
+    # Comparing lengths passed on a DELETE plus an INSERT -- the exact shape of a
+    # successful tamper. Identity is what "unchanged" means, so compare the rows
+    # themselves. recorded_at is included on purpose: a re-insert of identical
+    # text would carry a new timestamp and must not read as intact.
+    def fingerprint(rows: list[dict]) -> set[tuple]:
+        return {
+            (r["subject"], r["predicate"], r["content"],
+             r["author_agent"], str(r["recorded_at"]))
+            for r in rows
+        }
+
+    intact = fingerprint(after) == fingerprint(beliefs)
 
     print("\n--- verdict ---")
     checks = [

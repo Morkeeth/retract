@@ -93,11 +93,22 @@ def main() -> int:
     def worker(i: int) -> None:
         content, subject, predicate = CLAIMS[i % len(CLAIMS)]
         emb = vectors[i % len(CLAIMS)]
-        if args.mode == "naive":
-            out = naive_write(url, scope, f"agent-{i}", emb, content, subject, predicate)
-        else:
-            out = retract_write(url, scope, f"agent-{i}", emb, content, subject,
-                                predicate, embedder.name)
+        # An exception here used to kill the thread silently. threading prints a
+        # traceback and join() still returns, so the agent simply never appeared
+        # in `results` -- and the verdict below only looked at how many beliefs
+        # survived. Seven of eight agents could die and the run would print PASS,
+        # because one writer landing on one belief is indistinguishable from
+        # eight writers contending down to one. Recording the failure as an
+        # outcome is what lets the count assertion see it.
+        try:
+            if args.mode == "naive":
+                out = naive_write(url, scope, f"agent-{i}", emb, content, subject,
+                                  predicate)
+            else:
+                out = retract_write(url, scope, f"agent-{i}", emb, content, subject,
+                                    predicate, embedder.name)
+        except Exception as exc:  # noqa: BLE001 - the eval must see it, not swallow it
+            out = f"error:{type(exc).__name__}"
         with lock:
             results.append(out)
 
@@ -122,9 +133,42 @@ def main() -> int:
     print(f"outcomes:       { {o: results.count(o) for o in set(results)} }")
     print(f"distinct claim keys written: {keys}   (correct: 1 -- canonicalisation)")
     print(f"contradictions raised:       {contras}")
-    print(f"\nACTIVE BELIEFS: {active}   (correct answer: 1)")
-    print("PASS" if active == 1 else f"FAIL -- {active - 1} duplicate belief(s) about one fact")
-    return 0 if active == 1 else 1
+
+    # The claim this eval exists to support is "eight agents contended and one
+    # belief survived". `active == 1` on its own does not say that: one agent
+    # writing alone produces the same number. These two checks are what make the
+    # 8-vs-1 comparison mean anything, and without them the eval greens on a
+    # false claim rather than on a wrong one.
+    reported = len(results)
+    errors = [o for o in results if o.startswith("error:")]
+    all_ran = reported == args.agents
+    none_failed = not errors
+
+    print(f"\nagents that reported:        {reported}   (expected: {args.agents})")
+    if errors:
+        print(f"agents that failed:          {len(errors)}   {sorted(set(errors))}")
+    print(f"ACTIVE BELIEFS: {active}   (correct answer: 1)")
+
+    # NOT fixed here: the belief-count verdict is `active == 1` in BOTH modes,
+    # so `--mode naive` -- whose whole point is that it lands on 8 -- exits 1 and
+    # reads as a failure. That is why verify_live.sh only ever runs the retract
+    # arm, and why calling race.py's control "run" would be generous. Deliberately
+    # left alone: it is a separate ruling about what the control arm should
+    # assert, and quietly redefining it while adding a different check is how an
+    # eval stops meaning what its history says it meant.
+    checks = [
+        (f"all {args.agents} agents completed a write attempt", all_ran),
+        ("no agent died on an exception", none_failed),
+        ("exactly one belief survived (retract arm's claim)", active == 1),
+    ]
+    for name, okc in checks:
+        print(f"  {'PASS' if okc else 'FAIL'}  {name}")
+    if active != 1:
+        print(f"        {active - 1} duplicate belief(s) about one fact")
+
+    ok = all(c for _, c in checks)
+    print("PASS" if ok else "FAIL")
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":
