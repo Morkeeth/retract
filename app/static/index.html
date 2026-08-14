@@ -488,8 +488,16 @@ $('#tell').onclick=()=>{
   on('done',d=>{
     loadFeed(d.scope_token);
     const nComp=d.compensated||0;
+    // The unreachable count is the half this line used to omit. With two
+    // executed effects and one registered handler it read "1 executed effect
+    // reversed" and said nothing about the one that could not be, which is the
+    // stronger half of the claim reported without the honest half.
+    const nStuck=Math.max(0,(d.compensate||0)-nComp);
+    const stuck=nStuck
+      ? ` <b>${nStuck} executed effect could not be reversed</b> and stays flagged — no compensation is registered for that tool, and the system will not pretend it fixed something it cannot reach.`
+      : '';
     $('#punch').innerHTML=nComp
-      ? `${d.retracted} beliefs retracted, ${d.cancelled} pending effect cancelled, and <b>${nComp} executed effect reversed</b> — ledger shows needs_compensation → compensated with the reversal’s own id. The money is not pretended away; the reversal is recorded.`
+      ? `${d.retracted} beliefs retracted, ${d.cancelled} pending effect cancelled, and <b>${nComp} executed effect reversed</b> — ledger shows needs_compensation → compensated with the reversal’s own id. The money is not pretended away; the reversal is recorded.${stuck}`
       : `${d.retracted} beliefs retracted, ${d.cancelled} pending effect cancelled, and <b>${d.compensate} effect that already executed flagged for compensation</b>. The refund is not un-sent. The system says so instead of pretending.`;
     $('#tell').disabled=false; $('#storystate').textContent='builds a real belief chain, injects a real negation, retracts and compensates for real'
     es.close();

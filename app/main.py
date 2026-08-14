@@ -411,8 +411,22 @@ def _story_events(q: "queue.Queue[dict]") -> None:
             predicate=pred, parent=(str(ids[parent]) if parent is not None else None))
         time.sleep(0.25)
 
+    # Two executed effects, and only one of them is reachable. `card_charge` has
+    # no entry in COMPENSATIONS, so the cascade flags it and the handler refuses
+    # it — which is the half of the claim the page used to leave out. Every
+    # surface says compensation is closed-loop for registered tools and that
+    # unknown tools stay flagged; before this row the demo only ever showed the
+    # first half, and a judge reading the claim then watching the film saw the
+    # strong half demonstrated and the honest half absent.
+    #
+    # The name is deliberate. `card_charge` is already the canonical
+    # unregistered tool in experiments/compensate_eval.py, and DEMO.md's shot
+    # list was written around it. It does NOT collide with that eval's control
+    # arm: the assert at compensate_eval.py:92 is about the COMPENSATIONS
+    # registry, which this does not touch. Checked, not assumed.
     effects = [
         (2, "refund_issued", "rf-4471-1240", "executed", "$1,240 sent to customer 4471"),
+        (2, "card_charge", "cc-4471-89", "executed", "$89 processed for customer 4471"),
         (3, "tier_upgrade", "tu-4471", "pending", "priority support queued"),
         (4, "welcome_email", "we-9902", "pending", "welcome email to customer 9902"),
     ]
