@@ -17,26 +17,37 @@
      Only adjudication separates them -- and only then do they diverge.
   --------------------------------------------------------------------- */
   :root{
-    --ground:oklch(0.135 0.020 208);
-    --ground-2:oklch(0.185 0.023 208);
-    --line:oklch(0.315 0.021 208);
-    --ink:oklch(0.95 0.008 208);
-    --ink-dim:oklch(0.66 0.014 208);
+    /* Inverted to the brand set's near-white ground, 14 Aug. The dark build is
+       in git; this is not a revert of it, it is the same argument on paper. */
+    --ground:oklch(0.977 0.002 250);         /* the sheet */
+    --ground-2:oklch(1 0 0);                 /* panels sit ABOVE the sheet, not below */
+    --line:oklch(0.895 0.005 250);
+    --ink:oklch(0.235 0.012 265);
+    --ink-dim:oklch(0.545 0.010 265);
 
-    --sig-para:oklch(0.72 0.114 196);
-    --sig-neg:oklch(0.719 0.115 196.4);      /* one thousandth apart — the device, untouched */
-    --resolved-para:oklch(0.78 0.150 168);   /* after adjudication */
-    --resolved-neg:oklch(0.66 0.190 26);
+    /* THE DEVICE, PRESERVED. These two are the colours of "paraphrase" and
+       "negation" and they differ by the same margin their embeddings do --
+       L2 0.531 vs 0.532. Inverting the page darkened both by exactly the same
+       amount so the GAP is untouched; the gap is the whole argument and it is
+       not mine to spend. Measure them before changing either. */
+    --sig-para:oklch(0.555 0.114 196);
+    --sig-neg:oklch(0.554 0.115 196.4);      /* one thousandth apart */
+    --resolved-para:oklch(0.505 0.130 168);  /* after adjudication */
+    --resolved-neg:oklch(0.545 0.205 26);
 
-    --corrupt:oklch(0.635 0.233 25);         /* NEEDS COMPENSATION vermilion = wordmark #f54349 */
-    --strike:oklch(0.635 0.233 25);          /* the retraction stroke — records, does not erase */
-    --ok:oklch(0.80 0.150 168);
+    --accent:oklch(0.475 0.238 264);         /* the one dominant colour */
+    --on-accent:oklch(0.99 0 0);             /* text ON the accent, not the ground */
+    --corrupt:oklch(0.555 0.216 27);         /* irreversible consequence, and nothing else */
+    --strike:oklch(0.555 0.216 27);          /* the retraction stroke — records, does not erase */
+    --ok:oklch(0.495 0.128 166);
+    --wash-corrupt:oklch(0.965 0.028 27);    /* the flagged row's ground */
+    --wash-accent:oklch(0.968 0.022 264);
   }
   *{box-sizing:border-box;margin:0;padding:0;min-width:0}
   html,body{max-width:100%;overflow-x:hidden}
   body{
     background:var(--ground);color:var(--ink);
-    font-family:'Bricolage Grotesque',sans-serif;font-weight:200;
+    font-family:'Bricolage Grotesque',sans-serif;font-weight:300;
     font-size:15px;line-height:1.5;
     padding:clamp(20px,4vw,56px);
   }
@@ -46,14 +57,15 @@
      retraction red, the word left fully legible, the reversal recorded beneath it. */
   .brand{display:flex;flex-direction:column;gap:7px;margin-bottom:30px}
   .bword{position:relative;align-self:flex-start;font-family:'JetBrains Mono',monospace;
-         font-weight:700;font-size:22px;letter-spacing:.2em;color:var(--ink);line-height:1}
+         font-weight:700;font-size:20px;letter-spacing:.22em;color:var(--ink);line-height:1}
   .bword::after{content:'';position:absolute;left:-3px;right:-3px;top:53%;height:2px;
                 background:var(--strike)}
-  .brcpt{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.02em;color:var(--ok)}
+  .brcpt{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;
+         text-transform:uppercase;color:var(--ink-dim)}
 
   header{max-width:1180px;margin:0 auto 40px}
-  h1{font-size:clamp(38px,7vw,86px);font-weight:800;letter-spacing:-.045em;line-height:.92}
-  h1 em{font-style:normal;color:var(--sig-para)}
+  h1{font-size:clamp(34px,5.6vw,68px);font-weight:500;letter-spacing:-.028em;line-height:1.02}
+  h1 em{font-style:normal;color:var(--accent)}
   .sub{max-width:60ch;margin-top:18px;color:var(--ink-dim);font-size:17px}
   .facts{display:flex;flex-wrap:wrap;gap:10px 26px;margin-top:22px;
     font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-dim);
@@ -92,16 +104,18 @@
           white-space:nowrap;color:var(--ink-dim)}
   .verdict{margin-top:14px;font-size:13px;color:var(--ink-dim);max-width:70ch}
   .verdict strong{color:var(--corrupt);font-weight:500}
-  button{font-family:inherit;font-size:13px;font-weight:500;color:var(--ground);
-    background:var(--sig-para);border:0;padding:11px 20px;cursor:pointer;letter-spacing:.01em}
+  button{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;
+    color:var(--on-accent);background:var(--accent);border:0;padding:12px 22px;
+    cursor:pointer;letter-spacing:.06em;text-transform:uppercase}
   button:disabled{opacity:.4;cursor:default}
-  button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+  button.ghost{background:transparent;color:var(--ink);border:1px solid var(--ink)}
 
   /* ---- the race ---- */
   .panes{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);
          border:1px solid var(--line)}
   @media(max-width:820px){.panes{grid-template-columns:1fr}}
   .pane{background:var(--ground-2);padding:22px 20px;min-height:400px}
+  .node,.fxrow{border:0}
   .pane h3{font-size:12px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;
            color:var(--ink-dim);margin-bottom:2px}
   .pane .impl{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-dim);
@@ -112,7 +126,8 @@
   .big.good{color:var(--ok)}
   .biglabel{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim);
             margin-top:10px}
-  .stats{display:flex;gap:30px;margin-top:24px;padding-top:18px;border-top:1px solid var(--line)}
+  .stats{display:flex;gap:12px;margin-top:24px;padding-top:18px;border-top:1px solid var(--line)}
+  .stat{border:1px solid var(--line);padding:10px 14px;min-width:104px}
   .stat .n{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700}
   .stat .l{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);margin-top:3px}
   .log{margin-top:22px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.75;
@@ -139,7 +154,7 @@
   .node.gone .tag{color:var(--corrupt)}
   .node.kept .tag{color:var(--ok)}
   .node.derived .k::before{content:'└─ ';color:var(--line)}
-  .inject{border:1px solid var(--corrupt);background:oklch(0.22 0.045 26);
+  .inject{border:1px solid var(--corrupt);background:var(--wash-corrupt);
           padding:16px;margin:22px 0;font-size:15px}
   .inject .lbl{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;
                color:var(--corrupt);margin-bottom:7px}
@@ -159,7 +174,7 @@
   .s.cancelled{color:var(--ink-dim)}
   .s.needs_compensation{color:var(--corrupt);font-weight:700;font-size:12px;letter-spacing:.1em}
   .s.compensated{color:var(--ok);font-weight:700;font-size:12px;letter-spacing:.1em}
-  .fxrow.flagged{border-left:4px solid var(--corrupt);background:oklch(0.205 0.045 25)}
+  .fxrow.flagged{border-left:4px solid var(--corrupt);background:var(--wash-corrupt)}
   .fxrow.flagged .l{color:var(--ink)}
   .fxrow.flagged .money{font-family:'JetBrains Mono',monospace;font-size:23px;font-weight:700;
                         color:var(--corrupt)}
