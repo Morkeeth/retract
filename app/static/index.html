@@ -17,19 +17,20 @@
      Only adjudication separates them -- and only then do they diverge.
   --------------------------------------------------------------------- */
   :root{
-    --ground:oklch(0.16 0.021 208);
-    --ground-2:oklch(0.204 0.024 208);
-    --line:oklch(0.30 0.020 208);
-    --ink:oklch(0.94 0.008 208);
+    --ground:oklch(0.135 0.020 208);
+    --ground-2:oklch(0.185 0.023 208);
+    --line:oklch(0.315 0.021 208);
+    --ink:oklch(0.95 0.008 208);
     --ink-dim:oklch(0.66 0.014 208);
 
     --sig-para:oklch(0.72 0.114 196);
-    --sig-neg:oklch(0.719 0.115 196.4);      /* one thousandth apart */
+    --sig-neg:oklch(0.719 0.115 196.4);      /* one thousandth apart — the device, untouched */
     --resolved-para:oklch(0.78 0.150 168);   /* after adjudication */
     --resolved-neg:oklch(0.66 0.190 26);
 
-    --corrupt:oklch(0.62 0.212 26);
-    --ok:oklch(0.80 0.140 168);
+    --corrupt:oklch(0.635 0.233 25);         /* NEEDS COMPENSATION vermilion = wordmark #f54349 */
+    --strike:oklch(0.635 0.233 25);          /* the retraction stroke — records, does not erase */
+    --ok:oklch(0.80 0.150 168);
   }
   *{box-sizing:border-box;margin:0;padding:0;min-width:0}
   html,body{max-width:100%;overflow-x:hidden}
@@ -40,6 +41,15 @@
     padding:clamp(20px,4vw,56px);
   }
   .mono{font-family:'JetBrains Mono',monospace}
+
+  /* the wordmark lockup — the signature device, on the page: RETRACT struck in the
+     retraction red, the word left fully legible, the reversal recorded beneath it. */
+  .brand{display:flex;flex-direction:column;gap:7px;margin-bottom:30px}
+  .bword{position:relative;align-self:flex-start;font-family:'JetBrains Mono',monospace;
+         font-weight:700;font-size:22px;letter-spacing:.2em;color:var(--ink);line-height:1}
+  .bword::after{content:'';position:absolute;left:-3px;right:-3px;top:53%;height:2px;
+                background:var(--strike)}
+  .brcpt{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.02em;color:var(--ok)}
 
   header{max-width:1180px;margin:0 auto 40px}
   h1{font-size:clamp(38px,7vw,86px);font-weight:800;letter-spacing:-.045em;line-height:.92}
@@ -123,8 +133,9 @@
   .node .c{font-size:14px}
   .node .tag{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10px;
              letter-spacing:.08em;flex-shrink:0}
-  .node.gone{opacity:.45}
-  .node.gone .c{text-decoration:line-through;text-decoration-thickness:1px}
+  .node.gone{opacity:.72}
+  .node.gone .c{text-decoration:line-through;text-decoration-thickness:2px;
+                text-decoration-color:var(--strike);color:var(--ink-dim)}
   .node.gone .tag{color:var(--corrupt)}
   .node.kept .tag{color:var(--ok)}
   .node.derived .k::before{content:'└─ ';color:var(--line)}
@@ -146,11 +157,11 @@
             letter-spacing:.08em}
   .s.executed{color:var(--ok)} .s.pending{color:var(--ink-dim)}
   .s.cancelled{color:var(--ink-dim)}
-  .s.needs_compensation{color:var(--corrupt);font-weight:700;font-size:12px}
-  .s.compensated{color:var(--ok);font-weight:700;font-size:12px}
-  .fxrow.flagged{border-left:3px solid var(--corrupt);background:oklch(0.215 0.032 26)}
+  .s.needs_compensation{color:var(--corrupt);font-weight:700;font-size:12px;letter-spacing:.1em}
+  .s.compensated{color:var(--ok);font-weight:700;font-size:12px;letter-spacing:.1em}
+  .fxrow.flagged{border-left:4px solid var(--corrupt);background:oklch(0.205 0.045 25)}
   .fxrow.flagged .l{color:var(--ink)}
-  .fxrow.flagged .money{font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:700;
+  .fxrow.flagged .money{font-family:'JetBrains Mono',monospace;font-size:23px;font-weight:700;
                         color:var(--corrupt)}
   .punch{margin-top:20px;font-size:17px;max-width:64ch}
   .punch b{color:var(--corrupt);font-weight:500}
@@ -171,6 +182,10 @@
 </head>
 <body>
 <header>
+  <div class="brand">
+    <span class="bword">RETRACT</span>
+    <span class="brcpt">reversal recorded, not erased</span>
+  </div>
   <h1>Two agents.<br>One customer.<br><em>Different truths.</em></h1>
   <p class="sub">RETRACT is a shared memory for agent fleets. It guarantees that exactly one
     agent decides a given fact at a time — and when a belief turns out to be wrong, it takes
