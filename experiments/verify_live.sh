@@ -42,6 +42,21 @@ run() { # run <label> <cmd...>  -- a non-zero exit is a real failure, not noise
   rm -f /tmp/retract-verify.$$
 }
 
+# The .env names the Bedrock key pair RUNTIME_AWS_* so that loading it cannot
+# clobber a shell's real AWS credentials. boto3 only reads the unprefixed names,
+# so map them here rather than making every caller remember to.
+: "${AWS_ACCESS_KEY_ID:=${RUNTIME_AWS_ACCESS_KEY_ID:-}}"
+: "${AWS_SECRET_ACCESS_KEY:=${RUNTIME_AWS_SECRET_ACCESS_KEY:-}}"
+export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+export AWS_REGION="${AWS_REGION:-us-east-1}"
+
+# Pin the embedder. Left unset, get_embedder() resolves to "auto", which prints
+# one line about Bedrock being unavailable and then quietly uses the 384-dim
+# local model -- against a VECTOR(512) column, so every write fails with a
+# dimension error that reads like a bug in the engine. "bedrock" raises instead,
+# which is the answer this script exists to get.
+export RETRACT_EMBEDDER="${RETRACT_EMBEDDER:-bedrock}"
+
 step "0. Credentials present"
 missing=()
 for v in CRDB_URL AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
@@ -57,37 +72,37 @@ ok "CRDB_URL + AWS set"
   && ok "MCP credentials set" || meh "CRDB_API_KEY / CRDB_CLUSTER_ID unset -- mcp_eval will skip"
 
 step "1. Cluster reachable, and is it the Cloud one"
-run "connect + identify" psql "$CRDB_URL" -tAc \
+run "connect + identify" uv run python experiments/crdb.py -c \
   "SELECT current_database(), version();"
 
 step "2. schema_v3 migration (compensated status + compensated_by column)"
 if [ "${APPLY_SCHEMA:-0}" = "1" ]; then
-  run "apply schema_v3.sql" psql "$CRDB_URL" -f schema_v3.sql
+  run "apply schema_v3.sql" uv run python experiments/crdb.py -f schema_v3.sql
 else
-  meh "not applied. Re-run with APPLY_SCHEMA=1, or: psql \"\$CRDB_URL\" -f schema_v3.sql"
+  meh "not applied. Re-run with APPLY_SCHEMA=1, or: uv run python experiments/crdb.py -f schema_v3.sql"
 fi
-run "compensated_by column exists" psql "$CRDB_URL" -tAc \
+run "compensated_by column exists" uv run python experiments/crdb.py -c \
   "SELECT column_name FROM information_schema.columns
     WHERE table_name='effect' AND column_name='compensated_by';"
 
 step "3. The pitch: a retraction reverses the money"
-run "compensate_eval (incl. no-handler control)" python3 experiments/compensate_eval.py
-run "cascade" python3 experiments/cascade.py
+run "compensate_eval (incl. no-handler control)" uv run python experiments/compensate_eval.py
+run "cascade" uv run python experiments/cascade.py
 
 step "4. Everything PR #2 touched that could have regressed"
 # The `bucket` column was removed from the schema but left in three INSERT
 # paths, so every write failed on a clean load. These are the three.
-run "race" python3 experiments/race.py --mode retract --agents 8
-run "mcp_eval (nine refused write payloads)" python3 experiments/mcp_eval.py
+run "race" uv run python experiments/race.py --mode retract --agents 8
+run "mcp_eval (nine refused write payloads)" uv run python experiments/mcp_eval.py
 
 step "5. Tenancy -- needs no credentials, run it anyway"
-run "scope_eval (6 attacks, control arm)" python3 experiments/scope_eval.py
+run "scope_eval (6 attacks, control arm)" uv run python experiments/scope_eval.py
 
 step "6. The ledger claim, read back from the live cluster"
 # The Day-2 check in PLAN.md is 'a real reversal lands in the ledger with its
 # own id'. This is that sentence as SQL. A reversal that shares the original's
 # idempotency key would be a replay, not a reversal -- hence both columns.
-run "reversal rows exist and are distinct" psql "$CRDB_URL" -tAc \
+run "reversal rows exist and are distinct" uv run python experiments/crdb.py -c \
   "SELECT e.id, e.tool, e.idempotency_key, e.status, e.compensated_by
      FROM effect e WHERE e.compensated_by IS NOT NULL
        OR e.idempotency_key LIKE 'comp:%'
