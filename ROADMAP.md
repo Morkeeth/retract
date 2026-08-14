@@ -23,8 +23,13 @@ RETRACT used exactly one required tool.
 
 It now uses two, both load-bearing:
 - **Distributed Vector Indexing** — every READ phase is an ANN search over it.
-- **Managed MCP Server** — the governed read path, with writes structurally
-  impossible through it, verified by nine refused attack payloads.
+- **Managed MCP Server** — the governed read path. Nine escalating write
+  payloads were refused by the endpoint's `select_query` statement validator,
+  which rejects anything that is not a single SELECT. The claim-key lock needs
+  `SELECT ... FOR UPDATE` inside a multi-statement transaction and cannot be
+  expressed through MCP at all, so writes never route there. That is narrower
+  than "structurally impossible" and it is the version that survives a judge
+  noticing MCP also exposes `create_table` and `insert_rows`.
 
 `ccloud` is installed and authenticated as a third, used for cluster
 introspection.

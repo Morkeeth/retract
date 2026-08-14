@@ -138,8 +138,8 @@ ARNs, and five escalation paths were probed and verified blocked.
 
 ## What it is, in one paragraph
 
-Shared memory for agent fleets. Exactly one agent decides a given fact at a
-time — and when a belief turns out to be wrong, it takes back everything built
+Shared memory for agent fleets. Exactly one lock holder commits a given fact
+at a time — and when a belief turns out to be wrong, it takes back everything built
 on it, including the money that already moved. Concurrency control stops a bad
 fact being written; the retraction cascade reaches the bad fact that was
 written correctly, believed reasonably, and already paid out.
