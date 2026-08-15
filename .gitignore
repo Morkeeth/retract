@@ -21,3 +21,9 @@ rehearsal/
 # Dated test verdicts, appended by experiments/verify_live.sh. Local state, not
 # repo content -- and it would add noise to the submission diff.
 .zup-testrun.json
+
+# Internal product vision — never publish
+PRODUCT.md
+
+# Internal product planning. Never published.
+PRODUCT-V2-PLAN.md
