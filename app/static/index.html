@@ -96,19 +96,25 @@
   .challenge{font-size:13.5px;line-height:1.7;color:var(--ink);margin-bottom:26px;
              max-width:64ch}
   .challenge b{font-weight:400;color:var(--accent)}
-  .track{position:relative;height:72px;min-width:520px}
-  .axis{position:absolute;left:0;right:0;top:44px;height:1px;background:var(--line)}
-  .tick{position:absolute;top:44px;width:1px;height:6px;background:var(--line)}
+  .track{position:relative;height:98px;min-width:520px}
+  .axis{position:absolute;left:0;right:0;top:70px;height:1px;background:var(--line)}
+  .tick{position:absolute;top:70px;width:1px;height:6px;background:var(--line)}
   .tick span{position:absolute;top:10px;left:-14px;width:28px;text-align:center;
              font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-dim)}
-  .mark{position:absolute;top:14px;width:2px;height:30px;transform:translateX(-1px)}
+  .mark{position:absolute;top:40px;width:2px;height:30px;transform:translateX(-1px)}
   .mark.para{background:var(--sig-para)}
   .mark.neg{background:var(--sig-neg)}
-  .mark.resolved.para{background:var(--resolved-para);height:38px;top:6px}
-  .mark.resolved.neg{background:var(--resolved-neg);height:38px;top:6px}
-  .mark b{position:absolute;bottom:32px;left:50%;transform:translateX(-50%);
+  .mark.resolved.para{background:var(--resolved-para);height:38px;top:32px}
+  .mark.resolved.neg{background:var(--resolved-neg);height:38px;top:32px}
+  /* Labels stack instead of colliding. Two marks 0.001 apart is the page's whole
+     argument, so their labels sit on top of each other exactly where it matters
+     most. Row is assigned in drawRuler by left-to-right proximity. */
+  .mark b{position:absolute;bottom:calc(32px + var(--row,0) * 13px);left:50%;
+          transform:translateX(-50%);
           font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:400;
           white-space:nowrap;color:var(--ink-dim)}
+  .mark b::after{content:'';position:absolute;left:50%;top:100%;width:1px;
+          height:calc(var(--row,0) * 13px);background:var(--ink-dim);opacity:.35}
   .verdict{margin-top:14px;font-size:13px;color:var(--ink-dim);max-width:70ch}
   .verdict strong{color:var(--corrupt);font-weight:500}
   button{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;
@@ -211,11 +217,13 @@
     <span class="bword">RETRACT</span>
     <span class="brcpt">reversal recorded, not erased</span>
   </div>
-  <h1>Two agents.<br>One customer.<br><em>Different truths.</em></h1>
-  <p class="sub">RETRACT is a shared memory for agent fleets. Exactly one lock holder commits
-    a given fact at a time — and when a belief turns out to be wrong, it takes
-    back everything built on it — including the side effects that already
-    executed, which it reaches and records a reversal for.</p>
+  <h1>The refund went out.<br>The document was fake.<br><em>Now what?</em></h1>
+  <p class="sub">Refunds are the number one job companies hand to AI agents, and
+    <b>53% of organisations have already had an agent do something it was not
+    allowed to do</b>. Afterwards nothing connects the belief to what it already
+    did. RETRACT is the shared memory that does: one agent commits a fact at a
+    time, and when that fact turns out to be wrong it retracts everything built
+    on it, cancels what has not run yet, and records a reversal for what has.</p>
   <div class="facts" id="facts">
     <span>cluster <b id="f-cluster">…</b></span>
     <span>embedder <b id="f-embed">…</b></span>
@@ -432,10 +440,19 @@ function drawRuler(revealed){
     tk.style.left=((v-lo)/(hi-lo)*100)+'%';
     tk.innerHTML=`<span>${v.toFixed(1)}</span>`; t.appendChild(tk);
   }
-  pairs.forEach(p=>{
+  // Left to right, so a label only ever has to dodge the one before it. Marks
+  // closer than MIN_GAP% of the axis get pushed up a row; anything clear of the
+  // previous label drops back to row 0.
+  const MIN_GAP=7, ROWS=3;
+  let prevPct=-99, row=0;
+  pairs.slice().sort((a,b)=>a.distance-b.distance).forEach(p=>{
+    const pct=(p.distance-lo)/(hi-lo)*100;
+    row = (pct-prevPct < MIN_GAP) ? (row+1)%ROWS : 0;
+    prevPct = pct;
     const m=document.createElement('div');
     m.className='mark '+(p.same_fact?'para':'neg')+(revealed?' resolved':'');
-    m.style.left=((p.distance-lo)/(hi-lo)*100)+'%';
+    m.style.left=pct+'%';
+    m.style.setProperty('--row',row);
     if(revealed) m.innerHTML=`<b>${p.kind}</b>`;
     m.title=`${p.distance} — ${p.kind}`;
     t.appendChild(m);

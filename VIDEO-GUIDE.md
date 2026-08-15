@@ -7,9 +7,14 @@ CockroachDB's own judging prompts, not against instinct, and every timing in it
 was measured against the deployed URL today (15 Aug), not estimated. Where a
 number is not measured it says so.
 
-`DEMO.md` is the older shot script. **It has three stale numbers that will ruin
-a take** — see [What DEMO.md gets wrong now](#what-demomd-gets-wrong-now). Shoot
-from this file.
+**The eight commits were merged and pushed at 12:32 today.** `origin/main` is
+`7a873f2`, Railway has redeployed, and the live URL now serves it — verified:
+page byte-identical to `7a873f2`, `/healthz` 200, race and story both run clean.
+Every timing and every table below describes **that** build.
+
+`DEMO.md` is the older shot script and is now written against a build that no
+longer exists — including its ending. **Do not shoot from it.** See
+[What DEMO.md gets wrong now](#what-demomd-gets-wrong-now).
 
 ---
 
@@ -43,12 +48,15 @@ Do these in order. Item 2 is the one that will otherwise cost you take one.
 
    | Container state | Attempts | Outcome |
    |---|---|---|
-   | Cold / idle ~20min | **2** | **2 failed.** One returned `event: error {"error_class":"timeout"}` at the server's 60s cap. One was still unfinished in the browser at 55s — the effects table frozen on `EXECUTED / EXECUTED / PENDING / PENDING`, no cascade, `#punch` empty |
-   | Warm (run immediately after another) | **4** | **4 completed**, 31.9s / 32.2s / 32.6s / clean browser run |
+   | Cold / idle ~20min, **old build** | 2 | **2 failed.** One returned `event: error {"error_class":"timeout"}` at the server's 60s cap. One was still unfinished in the browser at 55s — effects table frozen on `EXECUTED / EXECUTED / PENDING / PENDING`, no cascade, `#punch` empty |
+   | Cold, **new build** (first run after the 12:32 deploy) | 1 | completed, 37.07s |
+   | Warm | 6 | **6 completed** — 31.9 / 32.2 / 32.6s on the old build, 37.8 / 37.2s and a clean browser run on the new |
 
-   Two for two, cold. Four for four, warm. Run the story once before you roll,
-   and again if you break for more than ten minutes. Do not let take one be the
-   warm-up.
+   **2 of 3 cold runs have failed. 6 of 6 warm runs have passed.** The one cold
+   success was on the new build, so the picture may have improved — but 37.4s
+   against a 60s server cap leaves 23 seconds of headroom, not a lot. Run the
+   story once before you roll, and again after any break longer than ten
+   minutes. Do not let take one be the warm-up.
 
 3. **Paste the demo token** into the header field. Both buttons fail closed
    without it. It lives in `.env` as `DEMO_TOKEN`. It is stored in
@@ -66,10 +74,11 @@ Do these in order. Item 2 is the one that will otherwise cost you take one.
 
 ---
 
-## THE CUT — 2:52, with 8 seconds of margin
+## THE CUT — 2:40, with 20 seconds of margin
 
 Timings marked **(measured)** are wall-clock from the deployed URL today, timed
-off the server-sent events, two runs, consistent to ±0.3s.
+off the server-sent events on the build now live (`7a873f2`), three runs,
+consistent to ±0.4s.
 
 ### 0:00–0:09 · ON CAMERA — the only talking head
 
@@ -138,7 +147,7 @@ That is the whole architectural argument, said once, over a live page.
 
 ### 0:38–1:08 · EIGHT AGENTS, ONE FACT — the race
 
-**CLICK: `Run both, live`.** *(measured: 8.1s end to end, both panes.)*
+**CLICK: `Run both, live`.** *(measured: 9.0s end to end on the new build, both panes.)*
 
 Do not cut and do not speed it up.
 
@@ -155,22 +164,32 @@ Point at the left pane's claim-key count and say the line most people miss:
 
 ---
 
-### 1:08–2:12 · THE STORY — store, retrieve, act, and be wrong
+### 1:08–1:45 · THE STORY — store, retrieve, act, and be wrong
 
-**CLICK: `Run the story, live`.** *(measured: 32.0s ±0.3 to the `done` event.)*
+**CLICK: `Run the story, live`.** *(measured on the deployed build 15 Aug:
+**37.4s ±0.4** to `done`, three runs — 37.07 / 37.82 / 37.25.)*
 
 This single click is the "memory in action, visibly" prompt, answered. Do not
-cut inside it. The measured beat map, so you know what you are holding on:
+cut inside it. Beat map, measured, with the film clock alongside so you know
+what you are holding on:
 
-| At | On screen | Say |
-|---|---|---|
-| 2.7s–14.3s | five beliefs build, one every ~2.9s, drawn as a chain | *"Five beliefs. Each one derived from the one above it."* |
-| 15.5s–16.6s | four effects attach — two **executed**, two **pending** | *"Three of them already did something. A refund of $1,240 has been sent."* |
-| 17.2s | the negation is injected: *"Customer 4471 FAILED identity verification — passport is forged"* | *"The passport was forged."* |
-| 19.8s | `verdict_pending` — same subject, same predicate, **raised as a contradiction, not merged** | *"Same claim key. So it is not stored alongside. It is raised."* |
-| 22.7s | the adjudicator's verdict and its reasoning appear | **OVERLAY 4.** Then say the limit, below. |
-| 23.2s–26.3s | `retracting`, then five fallout rows strike through | *"Four beliefs retracted. Customer 9902 — untouched."* |
-| 27.7s–28.5s | the effects table settles | **scroll here**, then [the money shot](#the-money-shot) |
+| Run | Film | On screen | Say |
+|---|---|---|---|
+| 3.0–15.7s | 1:11–1:24 | five beliefs build, one every ~3.1s, drawn as a chain | *"Five beliefs. Each one derived from the one above it."* |
+| 17.1–18.1s | 1:25–1:26 | four effects attach — two **executed**, two **pending** | *"Three of them already did something. A refund of $1,240 has been sent."* |
+| 18.9s | 1:27 | the negation is injected: *"Customer 4471 FAILED identity verification — passport is forged"* | *"The passport was forged."* |
+| 21.5s | 1:30 | `verdict_pending` — same subject, same predicate, **raised as a contradiction, not merged**, L2 0.977 | *"Same claim key. So it is not stored alongside. It is raised."* |
+| 24.3s | 1:32 | the adjudicator's verdict — `superseded` — and Claude's reasoning | **OVERLAY 4.** Then say the limit, below. |
+| **27.1s** | **1:35** | the contradiction is **resolved** under the same claim lock | *"And the verdict is applied, not just displayed."* |
+| 27.6–31.0s | 1:36–1:39 | `retracting`, then five fallout rows strike through | *"Four beliefs retracted. Customer 9902 — untouched."* |
+| 32.4–33.1s | 1:40–1:41 | the effects table settles | **scroll here**, then [the money shot](#the-money-shot) |
+| 34.8s / 36.9s | 1:43 / 1:45 | the two compensation boxes: the failure first, the reversal second | |
+
+**The 27.1s beat is new as of today's deploy** and it is the one worth naming
+out loud. Until this morning the deployed build printed Claude's verdict and
+then retracted regardless — invert the answer and nothing changed. It now calls
+`resolve()` under the claim lock. You can say "the verdict decides something"
+and it is true.
 
 **Say this out loud at 22.7s. It is the most credible sentence in the film:**
 
@@ -183,47 +202,52 @@ stand-in also scored 7/8, on a different case.
 
 ---
 
-### 2:12–2:30 · THE MONEY SHOT
+### 1:45–2:05 · THE MONEY SHOT
 
 No click. This is the tail of the same run.
 
-**Scroll to the effects table before 27.7s.** It is below the fold at 1440×900,
-and the first rehearsal pass on 14 Aug recorded this act entirely off screen.
+**Scroll to the effects table before 32.4s of the run (film 1:40).** It is below
+the fold at 1440×900, and the first rehearsal pass on 14 Aug recorded this act
+entirely off screen.
 
 What the deployed URL renders, in this row order *(photographed in a browser
-today — `shoot/ending-LIVE-origin-main.png`)*:
+after today's deploy — `shoot/ending-NOW-LIVE-7a873f2.png`)*:
 
 ```
-refund_issued     $1,240 sent to customer 4471       COMPENSATED
-card_charge       $89 processed for customer 4471    NEEDS COMPENSATION   <- red
-tier_upgrade      priority support queued            CANCELLED
-welcome_email     welcome email to customer 9902     PENDING
-refund_reversed   reversal of refund_issued          EXECUTED
+refund_issued              $1,240 sent to customer 4471                    NEEDS COMPENSATION
+card_charge                $89 processed for customer 4471                 NEEDS COMPENSATION
+tier_upgrade               priority support queued                         CANCELLED
+welcome_email              welcome email to customer 9902                  PENDING
+refund_reversal_requested  reversal of refund_issued — recorded, not dispatched   RECORDED · NOT DISPATCHED
 ```
 
-*(DEMO.md predicts a different order from `ORDER BY tool`. The rendered page
-keeps the order the effects streamed in and updates rows in place. Trust the
-screenshot.)*
+*(DEMO.md predicts a different order from `ORDER BY tool`, and an ending that
+says `COMPENSATED`. Both are the old build. Trust the screenshot.)*
 
-**Hold on `card_charge` — the second row.** It is the only one with a red left
-border and red money, and it is the one that did *not* work. Above the table two
-boxes appear, the failure first and the reversal second, so the spoken punch
-line can end on the reversal while the red row is still on screen.
+**This ending has no win state, and that is the point.** Five rows and not one
+says the system succeeded. Do not fight it in the edit — narrate it:
 
 > The pending effect was cancelled. The executed one could not be — the money
-> was already gone — so the system wrote a reversal with its own idempotency
-> key, exactly once, in the same transaction. And the tool with no registered
-> handler stays flagged. It will not pretend it fixed something it cannot reach.
+> was already gone — so the system recorded a reversal request under its own
+> idempotency key, `comp:` the original, exactly once, in the same transaction.
+> It stays flagged as needing compensation until a payment provider returns a
+> receipt, and no provider is wired here, so nothing settles. And the second
+> charge has no registered handler at all — not even a request. The system will
+> not pretend it reached something it cannot.
 
-**Say "a reversal is recorded", never "the money came back."** No payment
-provider is called. The true sentence is stronger and a judge cannot catch you
-on it.
+**Say "a reversal is recorded", never "the money came back."** As of this
+morning the ledger enforces that itself: it will not print the word
+`compensated` without a provider receipt. That is the strongest thing on screen
+and a judge cannot catch you on it.
+
+The two boxes above the table land failure-first, reversal-second, so the spoken
+punch line ends on the reversal.
 
 **OVERLAY 5** goes up over the table.
 
 ---
 
-### 2:30–2:44 · THE NUMBER — before RETRACT, after RETRACT
+### 2:05–2:25 · THE NUMBER — before RETRACT, after RETRACT
 
 This is a card, not the live page. It is the only slide in the film.
 
@@ -259,7 +283,7 @@ other six believable.
 
 ---
 
-### 2:44–2:52 · CLOSE
+### 2:25–2:40 · CLOSE
 
 Three seconds each, or the flipbook — see below.
 
@@ -269,7 +293,7 @@ Three seconds each, or the flipbook — see below.
 2. The live URL. *"Press the buttons yourself."*
 
 **On the flipbook:** it goes here or nowhere. It cannot replace any of
-0:09–2:44 — the prompt asks for the live demo and the live demo is the
+0:09–2:25 — the prompt asks for the live demo and the live demo is the
 submission's whole argument. If the flipbook runs longer than 8 seconds, cut
 the `FINDINGS.md` beat rather than the money shot. If it is not finished by
 20:00, the film is complete without it and shipping beats decorating.
@@ -287,10 +311,10 @@ each, no animation.
 | 1 | 0:14, over the ruler | `Amazon Bedrock · Titan Text Embeddings V2 (512-dim)`<br>`CockroachDB · Distributed Vector Index (C-SPANN)` |
 | 2 | 0:42, as the race panes fill | `CockroachDB · SERIALIZABLE transactions + durable locking`<br>`SELECT … FOR UPDATE · enable_durable_locking_for_serializable = true` |
 | 3 | 1:12, as beliefs build | `CockroachDB · bitemporal memory + append-only audit log` |
-| 4 | 1:31, over the verdict | `Amazon Bedrock · Claude Sonnet 4.5`<br>`us.anthropic.claude-sonnet-4-5-20250929-v1:0` |
-| 5 | 2:18, over the effects table | `CockroachDB · one serializable transaction:`<br>`retract the DAG · cancel pending · flag executed · write the reversal` |
-| 6 | 2:34, over the number card | `experiments/reach_eval.py · same case, two arms, live cluster` |
-| 7 | 2:48, over the closing URL | `CockroachDB Cloud Managed MCP Server · read-only, scoped mcp:read`<br>`retract-production.up.railway.app` |
+| 4 | 1:32, over the verdict | `Amazon Bedrock · Claude Sonnet 4.5`<br>`us.anthropic.claude-sonnet-4-5-20250929-v1:0` |
+| 5 | 1:45, over the effects table | `CockroachDB · one serializable transaction:`<br>`retract the DAG · cancel pending · flag executed · write the reversal` |
+| 6 | 2:08, over the number card | `experiments/reach_eval.py · same case, two arms, live cluster` |
+| 7 | 2:30, over the closing URL | `CockroachDB Cloud Managed MCP Server · read-only, scoped mcp:read`<br>`retract-production.up.railway.app` |
 
 **Overlay 7 is doing real work.** The Managed MCP Server is the second
 CockroachDB tool the submission's gate needs, and it is the one least visible on
@@ -303,8 +327,9 @@ populates after a story run**, so it must come after act 4, never before.
 
 ## Production
 
-- **3:00 is a hard reject on Devpost.** This cut is 2:52. There is no room for a
-  title card at the front.
+- **3:00 is a hard reject on Devpost.** This cut is 2:40 — twenty seconds of
+  margin, all of it bought by the story running 37.4s and the film not padding
+  around it. Do not spend the margin on a title card at the front.
 - **Public or unlisted, playable without a login.** Unlisted YouTube is fine;
   Drive links that ask for access are the classic disqualification.
 - **Upload tonight, not Monday.** Then open the Devpost submission, paste the
@@ -333,9 +358,15 @@ Three stale things, all of which would land in a take:
    smell, but it is inside the measured range and the sentence on camera is
    true. If a judge asks, those are the numbers.
 2. **The timings.** DEMO.md's second table has the story at 35.2s and the
-   negation arriving at 17.2s. The negation figure holds; the total is **32.0s**
-   today.
-3. **The cold-run timeout is not in it at all**, because it had not happened
+   negation arriving at 17.2s. On the build deployed at 12:32 today the story
+   runs **37.4s** and the negation lands at **18.9s**.
+3. **The ending.** DEMO.md's act 5 ends on `refund_issued → COMPENSATED` and
+   `refund_reversed → EXECUTED`. That was the old build. The build that is live
+   now ends on **`NEEDS COMPENSATION`** and
+   **`refund_reversal_requested · RECORDED · NOT DISPATCHED`** — the ledger will
+   not print `compensated` without a provider receipt. Shooting DEMO.md's ending
+   would put a table on screen that no longer exists.
+4. **The cold-run timeout is not in it at all**, because it had not happened
    yet. Pre-flight item 2 exists because of it.
 
 DEMO.md's *rules* are still right and are inherited here: no talking head over
@@ -345,10 +376,11 @@ the demo, two buttons drive everything, never edit a number.
 
 ## What this guide cannot tell you
 
-- **Whether the cold-start timeout recurs.** Observed once today, on the first
-  story run of the session; the two runs after it were clean. One warm-up run
-  covers it either way, which is why the fix is in the pre-flight rather than in
-  the code an hour before a shoot.
+- **Whether the cold-start timeout recurs on the new build.** 2 of 3 cold runs
+  have failed overall, but the only cold run on the currently-deployed build
+  passed at 37.07s. One data point is not a trend in either direction. The
+  warm-up run costs nothing and covers both cases, which is why the fix is in
+  the pre-flight rather than in the code an hour before a shoot.
 - **How the page behaves under a screen recorder.** Every timing here came from
   a terminal reading the event stream, not from a browser with a capture running.
   The beats are server-side and should not move; the render might.

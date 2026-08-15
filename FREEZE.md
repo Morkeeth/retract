@@ -1,77 +1,72 @@
 # CODE FREEZE — 15 Aug, before the 20:00 recording
 
-**Direct answer to the question asked: the code is good enough, and it is not
-the risk. The risk is that two versions of RETRACT exist and only one of them
-can be on camera.**
+**Direct answer to the question asked: the code is good enough, it is frozen,
+and it was never the risk. As of 12:32 today there is also only one version of
+RETRACT — the branch was merged, pushed and deployed, and the live demo is
+verified healthy on it.**
 
 Everything below is verified against the object today, 15 Aug. Where it is not,
 it says so.
 
 ---
 
-## The one decision, and it is Oscar's
+## THE DECISION WAS TAKEN AT 12:32 — merged, pushed, deployed, verified
 
-There are eight commits on `design/brand-identity` (HEAD `2193cef`) that have
-never been pushed. `origin/main` is `0bcbaef`, and **`0bcbaef` is exactly what
-the live URL serves** — byte-identical page, diffed today.
+This section used to pose the question. It is answered. Recorded here rather
+than deleted, because the reasoning is what a reader needs, not the suspense.
 
-Those eight commits are not cosmetic. Two of them change what the film shows.
+`origin/main` is **`7a873f2`** — the eight commits fast-forwarded onto `main`,
+plus one commit carrying this file, the shoot guide and the comparison frames.
+Railway redeployed. **I did not push it**; it happened while this lane was
+mid-report.
 
-| | **LIVE now** (`0bcbaef`) | **HEAD unpushed** (`2193cef`) |
+**Verified after the fact, at the object, because nobody had:**
+
+| Check | Result |
+|---|---|
+| Live page vs `7a873f2` | byte-identical — the new build is what serves |
+| `/healthz` | 200, 0.17s |
+| `race_retract` | 9.0s · 1 belief · 1 claim key · 7 contradictions |
+| `story`, cold (first run post-deploy) | **completed**, 37.07s — did not hit the 60s cap |
+| `story`, warm ×2 | 37.82s, 37.25s |
+| Ending, rendered in Chromium | correct — `shoot/ending-NOW-LIVE-7a873f2.png` |
+| `resolved` SSE beat | **present** at 27.1s — the verdict is now applied, not just printed |
+
+**The demo is healthy on the new build. Shoot against it.**
+
+### What actually changed on camera
+
+| | **was live** (`0bcbaef`) | **live now** (`7a873f2`) |
 |---|---|---|
-| Look | dark sheet | near-white paper, JetBrains Mono, wordmark |
-| Claude's verdict | shown, then **ignored** — `eng.retract()` runs unconditionally outside the `if contradiction` branch | applied: `eng.resolve()` closes the contradiction under the same claim lock |
-| Contradiction after the story | left **open** | resolved |
-| The ending | `refund_issued → COMPENSATED`, `refund_reversed → EXECUTED` | `refund_issued → NEEDS COMPENSATION`, `reversal … recorded, not dispatched → PENDING` |
-| Story runtime | **32.0s** (±0.3, two runs, deployed) | **17.3s** (two runs, local, same cluster) |
+| Look | dark sheet, alarm red | near-white paper, JetBrains Mono, one ramp |
+| Claude's verdict | shown, then **ignored** — `retract()` ran unconditionally | applied — `resolve()` closes the contradiction under the claim lock |
+| The ending | `refund_issued → COMPENSATED`, `refund_reversed → EXECUTED` | `NEEDS COMPENSATION`, `refund_reversal_requested · RECORDED · NOT DISPATCHED` |
+| Story runtime, deployed | 32.0s | **37.4s** |
 
-**The verdict row is the problem.** The shoot guide has you saying, over the
-adjudication at 22.7s, that a model decides and the database only guarantees
-atomicity. On the deployed build that sentence is theatre: invert Claude's
-answer and nothing observable changes. A judge who asks *"what if it had said
-duplicate?"* gets "nothing" from the code that is live.
+Both endings are in `shoot/` — `ending-OLD-0bcbaef.png` and
+`ending-NOW-LIVE-7a873f2.png`. The old one is the better-looking shot: it
+resolves to green. The new one has **no win state at all** — five rows and not
+one says the system succeeded. That is the honest picture, it is a harder shot
+to land, and the voice-over in `VIDEO-GUIDE.md` is written for it.
 
-**The ending is the trade.** LIVE shows the stronger punch line and the ledger
-says a word — `COMPENSATED` — that no payment provider earned. HEAD refuses the
-word and shows a recorded, undispatched reversal. Commit `671be37` exists to
-remove that overclaim. The shoot guide's voice-over already says *"a reversal is
-recorded, not the money came back"* — **on LIVE the screen contradicts the
-narration; on HEAD it agrees with it.**
+### A correction to this file's own earlier recommendation
 
-### Look at both endings before you rule
+The pre-push version of this document argued for pushing partly because "15
+seconds of runtime come back". **That was wrong, and it was wrong in the way
+that matters here.** It compared HEAD running on this laptop (17.3s) against the
+old build running on Railway (32.0s) and reported the gap as a product
+improvement. Two environments, one number. Measured properly, on Railway both
+times: the old build ran **32.0s** and the new one runs **37.4s** — the new
+build is **5.4s slower**, not 15s faster.
 
-Rendered in a real browser today, 1440×900, against the same live cluster:
+Nothing else in the recommendation depended on it, and the two reasons that did
+the real work both held up at the object: the verdict is now genuinely applied
+(`resolved` at 27.1s), and the ledger now refuses to say `compensated` without a
+receipt. The push was right. The third reason was an artifact of comparing rooms
+instead of builds.
 
-- `shoot/ending-LIVE-origin-main.png` — dark sheet, alarm-red `card_charge`,
-  green `COMPENSATED`, green `refund_reversed EXECUTED`
-- `shoot/ending-HEAD-unpushed.png` — paper sheet, both money rows orange
-  `NEEDS COMPENSATION`, `refund_reversal_requested · RECORDED · NOT DISPATCHED`
-- `shoot/fullpage-LIVE.png` and `shoot/fullpage-HEAD.png` — the whole page
-
-**LIVE is the better-looking ending and the weaker claim.** It resolves to
-green. HEAD's ending has no win state at all — five rows and not one of them
-says the system succeeded. That is the honest picture and it is a harder shot to
-land. Knowing that is the point of putting both files in front of you.
-
-### My recommendation
-
-**Merge and push before you shoot, then re-verify, then record.** Three reasons,
-in order of weight: the verdict sentence becomes true; the screen stops
-disagreeing with the voice-over; and 15 seconds of runtime come back inside a
-3:00 limit. The brand identity is the least of it.
-
-**I have not pushed and will not.** A push here is a merge to `main` plus a
-Railway redeploy of the demo the submission points at — outward, irreversible,
-and yours. The exact commands are at the bottom.
-
-**If you decide not to push**, the film is still shootable exactly as written —
-change one thing: at 22.7s, say *"a model decides"* and **do not** claim the
-verdict changes the outcome. Do not describe `resolve()`. Everything else in
-`VIDEO-GUIDE.md` was measured against the deployed build and holds.
-
-**Deadline for this decision: 17:00.** A redeploy needs a health check, one
-story run, and one race run before you can trust it — call it 30 minutes — and
-you do not want that happening at 19:50.
+The cost is real but small: 37.4s against the server's 60s cap leaves 23 seconds
+of headroom instead of 28.
 
 ---
 
@@ -82,18 +77,18 @@ you do not want that happening at 19:50.
 The three items are procedure, not commits:
 
 1. **Warm-up run — this is the real risk tonight, not the code.**
-   Measured today over six attempts: **2 of 2 cold runs failed, 4 of 4 warm runs
-   passed.** The two cold failures were (a) `event: error
-   {"error_class":"timeout"}` at the server's 60s cap, and (b) a browser run
-   still unfinished at 55s with the effects table frozen on the pre-cascade
-   state and the punch line blank. Both are the film's ending, failing.
+   Ten attempts today: **2 of 3 cold runs failed, 6 of 6 warm runs passed.** The
+   two cold failures were (a) `event: error {"error_class":"timeout"}` at the
+   server's 60s cap, and (b) a browser run still unfinished at 55s with the
+   effects table frozen pre-cascade and the punch line blank. Both are the
+   film's ending, failing. The one cold success was on the new build, at 37.07s.
    Run the story once as a throwaway before rolling, and again after any break
    longer than ten minutes. It is a procedure, not a patch — do not change
    timeout code hours before a shoot.
-2. **The ruler numbers in the script.** `DEMO.md`'s opening act names `0.531 /
-   0.532`. The live endpoint returns **1.074** and **1.073**. `VIDEO-GUIDE.md`
-   has the current figures; shoot from that file, not `DEMO.md`.
-3. **The push decision above, by 17:00.**
+2. **Shoot from `VIDEO-GUIDE.md`, not `DEMO.md`.** `DEMO.md` now describes a
+   build that no longer exists: its ruler numbers (`0.531 / 0.532` against a
+   live `1.074 / 1.073`), its timings, and — since 12:32 — its entire ending.
+3. **Nothing else.** The push decision is closed.
 
 ## Explicitly OUT OF SCOPE now
 
@@ -121,12 +116,19 @@ Run today, 15 Aug, against the live CockroachDB Cloud cluster
 | Check | Result |
 |---|---|
 | `experiments/verify_live.sh` | **10 passed · 0 failed · 1 skipped** (the skip is the deliberate `APPLY_SCHEMA` gate) |
-| Live demo `GET /` | 200, 0.31s |
+| Live demo `GET /` | 200 · page byte-identical to `7a873f2` |
+| Live `/healthz` | 200, 0.17s |
 | Live `/status` | `adjudicator: bedrock:claude`, `adjudicator_is_model: true`, `database: reachable`, `mcp: configured` |
-| Live `race_retract` | 8.1s · 1 belief · 1 claim key · 7 contradictions |
-| Live `story` | 32.0s ±0.3 over two runs, full ending renders |
+| Live `race_retract` (new build) | 9.0s · 1 belief · 1 claim key · 7 contradictions |
+| Live `story` (new build) | 37.4s ±0.4 over three runs, full ending renders, `resolved` beat present |
 | `experiments/reach_eval.py` (new) | **ALL PASS**, 7 checks, both arms |
-| HEAD story, local, same cluster | 17.3s over two runs, ending renders `needs_compensation` + recorded reversal |
+| New build's ending, in Chromium | correct — `shoot/ending-NOW-LIVE-7a873f2.png` |
+
+*`verify_live.sh` ran green **before** the deploy, on `2193cef`'s tree against
+the same cluster. It has not been re-run since `7a873f2` landed. `7a873f2` adds
+only docs and PNGs — no engine change — so re-running would exercise identical
+paths, but that is an inference, not a run. Two minutes if you want it green
+post-deploy.*
 
 **Two caveats on that green, stated rather than buried:**
 
@@ -136,38 +138,31 @@ Run today, 15 Aug, against the live CockroachDB Cloud cluster
   were written by `outbox_eval.py`, not by the demo path. The step is satisfied
   by eval-authored rows, so it does not prove the *product* path produced one.
   The live story run today did produce one; that is the evidence, not step 6.
-- The HEAD UI is verified **rendered, in Chromium, against the live cluster** —
-  see `shoot/ending-HEAD-unpushed.png`. It paints the new ending correctly, so
-  pushing does not blank the page. What is *not* verified is HEAD running on
-  Railway: it has only ever run on this laptop. That gap is why the push
-  decision has a re-verify step and a 17:00 cut-off rather than being free.
-- `experiments/rehearse.py` is stale against HEAD: it looks for a `compensated`
-  SSE event, which HEAD renamed to `compensation_recorded`, so it reports
+- `experiments/rehearse.py` is stale against the new build: it looks for a
+  `compensated` SSE event, which was renamed to `compensation_recorded`, so it reports
   `ACT 5 NOT MEASURED` on a run that was actually fine. Cosmetic, in a tool, not
   in the product — listed so nobody reads that line as a failure tonight.
 
 ---
 
-## The exact commands, for when you decide
+## What is still uncommitted
 
-Read them, do not paste them blind — they are here so the decision is not also a
-research task at 19:00.
+`experiments/reach_eval.py` — the before/after measurement — is **untracked**.
+The 12:32 commit took `VIDEO-GUIDE.md`, `FREEZE.md` and `shoot/`, but not the
+eval. So the film puts a number card on screen at 2:05 and cites a file that is
+not in the repo a judge would clone.
+
+One line, and it is not mine to run:
 
 ```bash
 cd ~/CODE/retract
-git checkout main && git merge --ff-only design/brand-identity   # 8 commits
-git push origin main                                             # triggers Railway
-
-# then, and only then, re-verify — do not skip this
-sleep 90
-curl -s https://retract-production.up.railway.app/status
-set -a && . ./.env && set +a
-./experiments/verify_live.sh
-uv run python /path/to/beat_timer.py story 1     # or click through the page once
+git add experiments/reach_eval.py
+git commit -m "The before/after the pitch was missing: same case, two arms"
+git push origin main            # docs + eval only, no engine change
 ```
 
-The `.gitignore` has one uncommitted modification. Look at it before any of the
-above; it is the only dirty file in the tree.
+Rewriting this file and `VIDEO-GUIDE.md` to describe the deployed build has also
+left the tree dirty again. Both now describe `7a873f2`.
 
-**Rollback:** Railway keeps the previous deployment. If the redeploy is worse,
-roll back in the Railway UI rather than force-pushing anything.
+**Rollback, if the new build reads worse under a camera:** Railway keeps the
+previous deployment. Roll back in the Railway UI. Do not force-push.
