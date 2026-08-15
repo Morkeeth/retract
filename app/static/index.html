@@ -218,12 +218,13 @@
     <span class="brcpt">reversal recorded, not erased</span>
   </div>
   <h1>The refund went out.<br>The document was fake.<br><em>Now what?</em></h1>
-  <p class="sub">Refunds are the number one job companies hand to AI agents, and
-    <b>53% of organisations have already had an agent do something it was not
-    allowed to do</b>. Afterwards nothing connects the belief to what it already
-    did. RETRACT is the shared memory that does: one agent commits a fact at a
-    time, and when that fact turns out to be wrong it retracts everything built
-    on it, cancels what has not run yet, and records a reversal for what has.</p>
+  <p class="sub">Companies now hand refunds to AI agents, and <b>53% of the 445
+    organisations surveyed by the Cloud Security Alliance</b> have had an agent
+    exceed its intended permissions. Afterwards nothing connects the belief to
+    what it already did. RETRACT is the shared memory that does: one agent
+    commits a fact at a time, and when that fact turns out to be wrong it
+    retracts everything built on it, cancels what has not run yet, and records a
+    reversal for what has.</p>
   <div class="facts" id="facts">
     <span>cluster <b id="f-cluster">…</b></span>
     <span>embedder <b id="f-embed">…</b></span>
@@ -246,7 +247,10 @@
       <p class="challenge" id="challenge">measuring seven claim pairs against the embedding model — the first page load warms it, about eight seconds</p>
       <div class="scroller"><div class="track" id="track"><div class="axis"></div></div></div>
       <p class="verdict" id="ruler-verdict">measuring…</p>
-      <div style="margin-top:16px"><button class="ghost" id="reveal">Reveal what each pair really is</button></div>
+      <!-- Disabled until /api/distances lands. The page tells the judge the first
+           load warms for ~8s; a click inside that window drew nothing, killed the
+           button permanently, and let the fetch reset the copy underneath. -->
+      <div style="margin-top:16px"><button class="ghost" id="reveal" disabled>Reveal what each pair really is</button></div>
     </div>
   </section>
 
@@ -312,10 +316,13 @@
     <p class="punch" id="punch"></p>
   </section>
   <section>
-    <h2>05 — What your fleet currently disagrees about</h2>
+    <h2>05 — The receipt, read back through a path that cannot write</h2>
     <p class="lede">Every other panel on this page reads the database over SQL. This one does not:
-      it is served by CockroachDB&rsquo;s Managed MCP Server, an endpoint that cannot write. The
-      surface that shows you the disagreements is structurally incapable of editing them.</p>
+      it is served by CockroachDB&rsquo;s Managed MCP Server, an endpoint with no write surface at
+      all. So the agent that shows you what happened is structurally incapable of changing it.
+      This heading used to say &ldquo;what your fleet currently disagrees about&rdquo; — it counted
+      open contradictions, and once the story started resolving them it always read zero. A number
+      that hits zero exactly when the product works is a badge, not a dependency.</p>
     <div class="feed" id="feed">
       <div class="feedhead">
         <span class="feednum" id="feednum">&mdash;</span>
@@ -418,6 +425,7 @@ function loadFeed(token){
 let pairs=[];
 fetch('/api/distances').then(r=>r.json()).then(d=>{
   pairs=d.pairs; drawRuler(false);
+  $('#reveal').disabled=false;   // safe to press only now that pairs exist
   const n=pairs.length, same=pairs.filter(p=>p.same_fact).length;
   $('#challenge').innerHTML=`${n} pairs of claims, placed by embedding distance. <b>${same} of them are the same fact said twice.</b> The other ${n-same} are a different customer, a negation, a changed amount, a changed tense. Point at the ${same}.`;
   const paras=pairs.filter(p=>p.same_fact).map(p=>p.distance);
@@ -426,6 +434,10 @@ fetch('/api/distances').then(r=>r.json()).then(d=>{
   $('#ruler-verdict').innerHTML= overlap
     ? `Same-fact pairs span <span class="mono">${Math.min(...paras)}–${Math.max(...paras)}</span>. Different-fact pairs start at <span class="mono">${Math.min(...others)}</span>. <strong>They interleave.</strong> No cut point on this axis separates a rephrasing from a negation, so RETRACT never lets distance make that call.`
     : `Clean separation at this sample size — but the design does not depend on it.`;
+}).catch(e=>{
+  // Without this, disabling the button above turns a failed fetch into a dead
+  // page. A failure must not look like a negative result: say it failed.
+  $('#challenge').innerHTML=`Could not load the pairs (<span class="mono">${e}</span>). The ruler below is empty because the request failed, not because there is nothing to show.`;
 });
 
 function drawRuler(revealed){
