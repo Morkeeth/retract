@@ -190,12 +190,12 @@ what it is.
 | Public repo | **verified** — `Morkeeth/retract`, PUBLIC, default `main` |
 | Open-source licence, detectable | **verified** — GitHub REST reports `apache-2.0`. Note: `gh repo view --json licenseInfo` returns null for the same repo while `gh api repos/... -q .license` returns Apache-2.0; the REST answer and `/license` endpoint agree, so the licence IS detected |
 | README with setup and run instructions | **unverified** — exists; never run by anyone who is not the author. `/stranger` before submitting |
-| Live demo URL | **partly** — https://retract-production.up.railway.app is up, but the last three commits are undeployed |
+| Live demo URL | **verified 18 Aug ~15:20 UTC** — https://retract-production.up.railway.app returns 200 on GET; `/status` reports `embedder: bedrock:titan`, `adjudicator: bedrock:claude` (`adjudicator_is_model: true`), `mcp: configured`, `contradiction_feed: live`. `origin/main == HEAD == aff86d4`, so the deploy is current — the "three undeployed commits" note above is resolved. NB: the app answers `405` to HEAD (`curl -sI`) by design; use GET |
 | Video, under 3:00 | **NOT DONE** — script is `DEMO.md`, cut lands 2:55, nothing shot |
 | Video public on YouTube or Vimeo | **NOT DONE** — hosting is a rules requirement, not a preference |
 | Which CockroachDB tools + how | **done** — this file |
 | Which AWS services + how | **done** — this file |
-| Architecture diagram | optional, not doing. See `ROADMAP.md` on the second signature device |
+| Architecture diagram | **done (BONUS) 18 Aug** — Mermaid diagram in `README.md` under `## Architecture`: fleet ⇄ vector index + Cloud MCP ⇄ Bedrock Titan/Claude ⇄ retraction/compensation ledger |
 | Feedback on CockroachDB AI tools | optional, and we have unusually specific feedback: the 0.80 reuse threshold in Cockroach's own agent-memory post is inverted on their partner's embedding model. Worth submitting |
 
 ## Open risks, named

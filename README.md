@@ -78,6 +78,55 @@ stand-in got, on a different case.
 
 ---
 
+## Architecture
+
+```mermaid
+flowchart TB
+    FLEET["Agent fleet — concurrent agents"]
+
+    subgraph aws["AWS Bedrock"]
+        TITAN["Titan Text Embeddings V2 — 512-dim vectors"]
+        CLAUDE["Claude adjudicator — reads the two claims"]
+    end
+
+    subgraph crdb["CockroachDB Cloud"]
+        MCP["Cloud Managed MCP Server — governed read path, mcp:read"]
+        VEC["Distributed Vector Index — C-SPANN"]
+        MEM["Memory + derivation DAG — bitemporal rows"]
+        COMMIT["COMMIT — serializable txn, claim-key lock, durable locking"]
+        RETRACT["Retraction cascade — walks the DAG"]
+        HANDLER["Compensation handler — writes reversal comp:key"]
+        LEDGER["Effect ledger + append-only audit log"]
+    end
+
+    FLEET -->|"READ: ANN search at a snapshot"| VEC
+    FLEET -->|"inspect beliefs, read-only"| MCP
+    FLEET -->|"THINK: name the claim, no txn"| CLAUDE
+    TITAN -->|"embeds every claim"| VEC
+    MCP --> MEM
+    VEC --> MEM
+    CLAUDE -->|"verdict on contradiction"| COMMIT
+    COMMIT --> MEM
+    MEM -->|"belief proven wrong"| RETRACT
+    RETRACT -->|"cancel pending effects"| LEDGER
+    RETRACT -->|"flag executed as needs_compensation"| HANDLER
+    HANDLER -->|"reversal, same txn"| LEDGER
+    LEDGER -->|"status: compensated"| MEM
+```
+
+**READ** searches the distributed vector index (and can inspect the fleet's
+beliefs through the governed Cloud MCP read path, which is structurally
+write-incapable). **THINK** happens outside any transaction; Claude on Bedrock
+adjudicates a contradiction. **COMMIT** takes the claim-key lock in a
+serializable transaction. When a belief is later proven wrong, the retraction
+cascade walks the derivation DAG, cancels *pending* effects, and flags
+*already-executed* ones `needs_compensation`; the compensation handler writes a
+reversal with its own `comp:<key>` idempotency key in the same transaction.
+Titan embeddings feed the index; every belief, effect and reversal is a durable
+row in the ledger.
+
+---
+
 ## Run it
 
 ```bash
