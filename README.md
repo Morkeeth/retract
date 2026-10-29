@@ -100,20 +100,20 @@ stand-in got, on a different case.
 
 ```mermaid
 flowchart TB
-    FLEET["Agent fleet ;  concurrent agents"]
+    FLEET["Agent fleet — concurrent agents"]
 
     subgraph aws["AWS Bedrock"]
-        TITAN["Titan Text Embeddings V2 ;  512-dim vectors"]
-        CLAUDE["Claude adjudicator ;  reads the two claims"]
+        TITAN["Titan Text Embeddings V2 — 512-dim vectors"]
+        CLAUDE["Claude adjudicator — reads the two claims"]
     end
 
     subgraph crdb["CockroachDB Cloud"]
-        MCP["Cloud Managed MCP Server ;  governed read path, mcp:read"]
-        VEC["Distributed Vector Index ;  C-SPANN"]
-        MEM["Memory + derivation DAG ;  bitemporal rows"]
-        COMMIT["COMMIT ;  serializable txn, claim-key lock, durable locking"]
-        RETRACT["Retraction cascade ;  walks the DAG"]
-        HANDLER["Compensation handler ;  writes reversal comp:key"]
+        MCP["Cloud Managed MCP Server — governed read path, mcp:read"]
+        VEC["Distributed Vector Index — C-SPANN"]
+        MEM["Memory + derivation DAG — bitemporal rows"]
+        COMMIT["COMMIT — serializable txn, claim-key lock, durable locking"]
+        RETRACT["Retraction cascade — walks the DAG"]
+        HANDLER["Compensation handler — writes reversal comp:key"]
         LEDGER["Effect ledger + append-only audit log"]
     end
 
@@ -164,7 +164,7 @@ for f in ('schema.sql','schema_v2.sql','schema_v3.sql'):
 # Write paths fail closed without a token.
 export DEMO_TOKEN='some-long-random-string'
 
-# no AWS account? this runs entirely offline (hash is plumbing-only ;  not semantic):
+# no AWS account? this runs entirely offline (hash is plumbing-only — not semantic):
 RETRACT_EMBEDDER=hash RETRACT_ADJUDICATOR=heuristic \
   uv run uvicorn app.main:app --port 8117
 ```
@@ -284,14 +284,14 @@ on the page.
 ```
 retract/engine.py        three-phase commit, contradiction detection, retraction cascade
 retract/compensate.py    registry + handler: needs_compensation → compensated
-retract/claim.py         canonicalisation ;  the guarantee lives here, so it is boring by design
+retract/claim.py         canonicalisation — the guarantee lives here, so it is boring by design
 retract/embed.py         Titan / local / hash, each declaring its own dimension
 retract/adjudicate.py    Claude / heuristic stand-in
-retract/mcp.py           the governed read path ;  reads only, structurally
+retract/mcp.py           the governed read path — reads only, structurally
 schema.sql               memory (bitemporal), derivation DAG, effect ledger, audit log
 schema_v2.sql            the claim key and contradiction tables
 schema_v3.sql            compensated status + compensated_by (ALTER path)
-app/main.py              demo surface ;  every number is a live transaction
+app/main.py              demo surface — every number is a live transaction
 app/middleware.py        demo token, rate limit, size cap, structured logs
 app/static/index.html    the page
 Dockerfile               Bedrock-only image; no torch, no silent fallback
