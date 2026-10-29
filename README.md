@@ -1,7 +1,25 @@
 # RETRACT
 
+## TLDR
+
+Keep shared agent beliefs connected to their derived actions and compensation records.<br>
+For teams investigating what a wrong belief caused after side effects have occurred.<br>
+Retraction cancels pending effects and flags executed ones for compensation; it does not erase real-world history.
+
+## The problem and approach
+
+By the time a forged passport is discovered the refund it justified has been sent, and deleting the memory does not un-send the money; run eight agents against one memory and they also leave eight contradictory beliefs for one customer.
+Exactly one agent decides a claim key at a time, inside a short serializable CockroachDB transaction; retracting a belief walks the derivation graph, cancels pending effects and flags executed ones for compensation in the same transaction.
+Of roughly twenty agent-memory products examined at source level, none attaches an action to a memory. Built for the CockroachDB x AWS Hackathon, August 2026. Live demo: https://retract-production.up.railway.app
+
+## Review and pick up the work
+
+[Agent guide](AGENTS.md)
+
+Start with the linked source, setup and evidence. Recorded demos and sample data keep their original scope; use the repository instructions for a fresh run.
+
 **A wrong belief has already moved money. RETRACT is the shared memory that can
-reach what that belief caused — and reverse it.**
+reach what that belief caused ;  and reverse it.**
 
 Shared memory for agent fleets, built for the CockroachDB × AWS Hackathon,
 August 2026. Live demo: https://retract-production.up.railway.app
@@ -18,14 +36,14 @@ Run more than one agent against a shared memory and a second thing breaks that a
 single-agent memory never surfaces: concurrent agents corrupt shared beliefs.
 Eight agents learn the same fact about a customer at the same moment, each
 phrasing it differently, and a naive memory ends up holding eight contradictory
-beliefs — and eight different *keys* — for one customer.
+beliefs ;  and eight different *keys* ;  for one customer.
 
 Both failures matter. The one almost nobody else has a concept for is the first.
 
 Across roughly twenty agent-memory products examined at source level, **none has
 any concept of an action attached to a memory**. A 435-work survey found 27
 exposing rollback and none scoring whether it worked. Reaching the side effects
-a wrong belief already caused — and reversing them — is the unoccupied cell.
+a wrong belief already caused ;  and reversing them ;  is the unoccupied cell.
 
 ---
 
@@ -36,9 +54,9 @@ Retracting a belief retracts every belief derived from it, cancels their
 *pending* side effects, and flags the *already-executed* ones as
 `needs_compensation`. A registered handler then writes a reversal effect with
 its own idempotency key (`comp:<original>`), moves the original to
-`compensated`, and records the reversal id — in the same transaction. A tool
+`compensated`, and records the reversal id ;  in the same transaction. A tool
 with no handler stays flagged; silently greening it would be the failure mode
-this project exists to argue against. Unrelated beliefs are left alone — the
+this project exists to argue against. Unrelated beliefs are left alone ;  the
 blast radius is asserted in the tests, because a cascade that retracts
 everything is as wrong as one that retracts nothing.
 
@@ -47,7 +65,7 @@ assumed it: on two independent production embedding models, a paraphrase and a
 flat negation can sit 0.001 apart, and a different customer can be *nearer* than
 the same fact reworded. Full data in [FINDINGS.md](FINDINGS.md). So identity
 comes from a canonical `(subject, predicate)` claim key, and vectors do retrieval
-— the job they are actually good at.
+;  the job they are actually good at.
 
 **A turn is three phases**, because a transaction cannot be held open across LLM
 inference:
@@ -56,15 +74,15 @@ inference:
 |---|---|
 | **READ** | ANN search over the distributed vector index at a recorded snapshot. No locks survive. |
 | **THINK** | The model decides, and names the claim it wants to assert. Entirely outside any transaction. |
-| **COMMIT** | A short serializable transaction: lock the claim key, look at what is already believed, then write — or raise a contradiction. |
+| **COMMIT** | A short serializable transaction: lock the claim key, look at what is already believed, then write ;  or raise a contradiction. |
 
 **What the database guarantees, and what it does not.** It guarantees that
 exactly one agent holds a given claim key inside the commit transaction at a
 time (a lock row taken with durable locking enabled so a lease transfer cannot
 drop it), and that the outcome is recorded atomically with the memory and the
-side effects it touches. It does not guarantee the adjudication is correct — a
+side effects it touches. It does not guarantee the adjudication is correct ;  a
 model does that, and the page says so. As of **14 Aug 2026, 09:30 CEST** the
-live adjudicator is **Claude on Bedrock** — `/status` returns
+live adjudicator is **Claude on Bedrock** ;  `/status` returns
 `"adjudicator": "bedrock:claude"` and `"adjudicator_is_model": true`. Until
 that morning it was a labelled heuristic stand-in, blocked on a one-time
 Anthropic use-case form; the form cleared and the next container restart picked
@@ -167,7 +185,7 @@ keeping from that history:
 
 - The **default model id is pinned for a reason**. The host IAM user is scoped
   to specific model ARNs, so `us.anthropic.claude-sonnet-4-5-20250929-v1:0`
-  works and a newer id does not — a Converse call to
+  works and a newer id does not ;  a Converse call to
   `us.anthropic.claude-sonnet-4-6` with that credential returns
   `AccessDeniedException ... not authorized to perform: bedrock:InvokeModel`
   (probed 14 Aug, us-east-1). Changing `RETRACT_ADJUDICATOR_MODEL` means
@@ -196,17 +214,17 @@ uv run python experiments/adjudicate_eval.py       # paraphrase vs contradiction
 
 | Eval | Result |
 |---|---|
-| `race --mode naive` | **8** active beliefs, **8** distinct claim keys, 0 contradictions seen — same cluster, same table, same embeddings, no claim lock |
+| `race --mode naive` | **8** active beliefs, **8** distinct claim keys, 0 contradictions seen ;  same cluster, same table, same embeddings, no claim lock |
 | `race --mode retract` | **1** active belief, **1** claim key, 7 contradictions raised |
-| `cascade` | 8/8 — including *"9902 untouched"* and *"executed refund → needs_compensation"* |
+| `cascade` | 8/8 ;  including *"9902 untouched"* and *"executed refund → needs_compensation"* |
 | `compensate_eval` | refund ends `compensated` with one reversal row; unregistered tool stays `needs_compensation`; unrelated customer untouched. Run against the live Cloud cluster on 14 Aug with the real Titan embedder (step 3 of `experiments/verify_live.sh`); the no-handler control arm was also watched failing when a handler was patched in |
-| `day1_conflict` | NEAR 13% vs FAR 8%, p = 0.15 — **not significant**. We tested whether the explicit lock could be dropped in favour of the vector index. It cannot |
+| `day1_conflict` | NEAR 13% vs FAR 8%, p = 0.15 ;  **not significant**. We tested whether the explicit lock could be dropped in favour of the vector index. It cannot |
 
 ---
 
 ## CockroachDB tools used
 
-**Cloud Managed MCP Server** — the agents' governed read path. Reads go through
+**Cloud Managed MCP Server** ;  the agents' governed read path. Reads go through
 the managed endpoint at `https://cockroachlabs.cloud/mcp`, authenticated by a
 Cloud service account and scoped `mcp:read`. Writes never do, and *cannot*: the
 claim lock needs `SELECT ... FOR UPDATE` inside a multi-statement serializable
@@ -215,24 +233,24 @@ transaction, which MCP's surface has no way to express.
 So agents inspect the fleet's beliefs through an endpoint they are structurally
 incapable of corrupting via the read tool, while every mutation is funnelled
 through the one code path that takes the lock. `experiments/mcp_eval.py`
-verifies this rather than asserting it — nine escalating write attempts through
+verifies this rather than asserting it ;  nine escalating write attempts through
 the read tool (plain DML, stacked statements, a CTE-wrapped DELETE, comment-
 and newline-obscured payloads), all nine refused, with the memory re-read
 afterwards to confirm nothing changed.
 
-**Distributed Vector Indexing (C-SPANN)** — `CREATE VECTOR INDEX ON memory
+**Distributed Vector Indexing (C-SPANN)** ;  `CREATE VECTOR INDEX ON memory
 (scope, embedding)`, prefix-ordered so the scope filter accelerates. Every agent
 turn opens with an ANN search over it. Load-bearing: remove it and the READ phase
 has nothing to read.
 
-**Serializable transactions + durable locking** — the claim lock runs with
+**Serializable transactions + durable locking** ;  the claim lock runs with
 `enable_durable_locking_for_serializable = true`, because unreplicated
 `FOR UPDATE` locks are documented as best-effort and must not be relied on for
 correctness. The commit phase is multi-round-trip, so automatic retry never
 fires and the client owns the `40001` loop; `inject_retry_errors_enabled` is how
 we prove that loop works instead of asserting it.
 
-**Bitemporal memory + append-only audit** — `AS OF SYSTEM TIME` is bounded by a
+**Bitemporal memory + append-only audit** ;  `AS OF SYSTEM TIME` is bounded by a
 4-hour GC window on this cluster, so time travel is a fast path and never the
 record. The audit substrate is explicit rows, which is also the stronger artifact:
 a reviewer can query a table and cannot query an engine feature.
@@ -241,18 +259,18 @@ a reviewer can query a table and cannot query an engine feature.
 
 ## AWS services used
 
-**Amazon Bedrock — Titan Text Embeddings V2** at 512 dimensions, generating every
+**Amazon Bedrock ;  Titan Text Embeddings V2** at 512 dimensions, generating every
 vector CockroachDB indexes. (Titan accepts 256/512/1024 and *rejects* 384, which
-forced a schema migration — measured, not assumed.)
+forced a schema migration ;  measured, not assumed.)
 
-**Amazon Bedrock — Claude as the adjudicator: running since 14 Aug, scoring
+**Amazon Bedrock ;  Claude as the adjudicator: running since 14 Aug, scoring
 7/8.** The state belongs in the bold line, because a sponsor-tech list is read
 by skimming and a correction two sentences down does not survive a skim. It
 adjudicates every contradiction the live demo raises, via
 `us.anthropic.claude-sonnet-4-5-20250929-v1:0`; the `us.` inference profile is
 required, as the bare model id is not invocable on demand. It scores 7/8 on
-`experiments/adjudicate_eval.py` — not 8/8, which earlier drafts of this repo
-predicted it would — and the eval's exit code says so.
+`experiments/adjudicate_eval.py` ;  not 8/8, which earlier drafts of this repo
+predicted it would ;  and the eval's exit code says so.
 
 Both sit behind interfaces (`retract/embed.py`, `retract/adjudicate.py`) so the
 whole project runs with no AWS account at all. The fallbacks are labelled
@@ -290,3 +308,7 @@ NIGHT-RUN.md             overnight brief this change set answered
 Apache 2.0.
 
 See [SECURITY.md](SECURITY.md) for the blast radius, honestly described.
+
+## License and data boundaries
+
+Code terms: [LICENSE](LICENSE). Data, provider responses, media, fonts and other third-party assets may have separate terms. Repository access alone does not grant rights to those materials. 
