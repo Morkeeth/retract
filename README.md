@@ -1,10 +1,11 @@
 # RETRACT
 
-**A wrong belief has already moved money. RETRACT is the shared memory that can
-reach what that belief caused — and reverse it.**
+**RETRACT is shared memory for agent fleets that can reach the money a wrong belief already moved, and reverse it.**
 
-Shared memory for agent fleets, built for the CockroachDB × AWS Hackathon,
-August 2026. Live demo: https://retract-production.up.railway.app
+By the time a forged passport is discovered the refund it justified has been sent, and deleting the memory does not un-send the money; run eight agents against one memory and they also leave eight contradictory beliefs for one customer.
+For teams running several agents against one memory with real side effects.
+Exactly one agent decides a claim key at a time, inside a short serializable CockroachDB transaction; retracting a belief walks the derivation graph, cancels pending effects and flags executed ones for compensation in the same transaction.
+Of roughly twenty agent-memory products examined at source level, none attaches an action to a memory. Built for the CockroachDB x AWS Hackathon, August 2026. Live demo: https://retract-production.up.railway.app
 
 ---
 
